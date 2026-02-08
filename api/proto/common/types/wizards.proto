@@ -1,0 +1,85 @@
+/*
+ * This program source code file is part of KiCad, a free EDA CAD application.
+ *
+ * Copyright (C) 2026 KiCad Developers, see AUTHORS.txt for contributors.
+ *
+ * This program is free software: you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License as published by the
+ * Free Software Foundation, either version 3 of the License, or (at your
+ * option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful, but
+ * WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ * General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License along
+ * with this program.  If not, see <http://www.gnu.org/licenses/>.
+ */
+
+/*
+ * wizards.proto
+ * Messages that describe content generation wizards
+ */
+
+syntax = "proto3";
+
+package kiapi.common.types;
+
+
+enum WizardParameterDataType
+{
+  WPDT_UNKNOWN = 0;
+  WPDT_DISTANCE = 1;  // int32 nanometers
+  WPDT_AREA = 2;      // int32 square nanometers
+  WPDT_VOLUME = 3;    // int32 cubic nanometers
+  WPDT_TIME = 4;      // int32 picoseconds
+  WPDT_ANGLE = 5;     // double degrees
+  WPDT_STRING = 6;
+  WPDT_INTEGER = 7;   // int32 (quantity, etc)
+  WPDT_REAL = 8;      // double value
+}
+
+enum WizardParameterCategory
+{
+  WPC_UNKNOWN = 0;
+  WPC_PACKAGE = 1;
+  WPC_PADS = 2;
+  WPC_3DMODEL = 3;
+  WPC_METADATA = 4;
+  WPC_RULES = 5;
+}
+
+message WizardParameter
+{
+  string identifier = 1;
+  string name = 2;
+  string description = 3;
+  WizardParameterCategory category = 4;
+  WizardParameterDataType type = 5;
+  oneof value {
+    int32 int_value = 6;
+    double double_value = 7;
+    string string_value = 8;
+  }
+}
+
+enum WizardContentType
+{
+  WCT_UNKNOWN = 0;
+  WCT_SYMBOL = 1;
+  WCT_FOOTPRINT = 2;
+}
+
+message WizardInfo
+{
+  WizardMetaInfo meta = 1;
+  repeated WizardParameter parameters = 2;
+}
+
+message WizardMetaInfo {
+  string identifier = 1;
+  string name = 2;
+  string description = 3;
+  repeated WizardContentType types_generated = 4;
+}

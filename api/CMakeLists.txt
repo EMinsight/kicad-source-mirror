@@ -25,6 +25,7 @@ set( KIAPI_PROTO_SRCS
     common/types/enums.proto
     common/types/jobs.proto
     common/types/project_settings.proto
+    common/types/wizards.proto
 
     common/commands/base_commands.proto
     common/commands/editor_commands.proto

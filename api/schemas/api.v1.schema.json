@@ -110,14 +110,46 @@
               "entrypoint"
             ]
           }
+        },
+        "generator": {
+          "type": "object",
+          "description": "A description of the content generated, if this is a generator plugin",
+          "properties": {
+            "entrypoint": {
+              "type": "string",
+              "description": "The way KiCad should launch this action (for example, the name of a Python script)"
+            },
+            "icons-light": {
+              "type": "array",
+              "description": "A list of one or more paths to PNG files (use multiple files for high DPI support) to be shown in light mode",
+              "items": {
+                "type": "string",
+                "pattern": "^.*\\.png$"
+              }
+            },
+            "icons-dark": {
+              "type": "array",
+              "description": "A list of one or more paths to PNG files (use multiple files for high DPI support) to be shown in dark mode",
+              "items": {
+                "type": "string",
+                "pattern": "^.*\\.png$"
+              }
+            }
+          },
+          "required": [
+            "entrypoint"
+          ]
         }
       },
       "required": [
         "identifier",
         "name",
         "description",
-        "runtime",
-        "actions"
+        "runtime"
+      ],
+      "oneOf":[
+        { "required": [ "actions" ] },
+        { "required": [ "generator" ] }
       ]
     }
   }
