@@ -42,10 +42,8 @@ void FOOTPRINT_WIZARD_FRAME::DisplayWizardInfos()
     msg = _( "Footprint Wizard" );
     msg << wxT( " [" );
 
-    if( !m_wizardName.IsEmpty() )
-        msg << m_wizardName;
-    else
-        msg += _( "no wizard selected" );
+    wxString wizardName = m_currentWizard ? m_currentWizard->Info().meta.name : _( "no wizard selected" );
+    msg << wizardName;
 
     msg << wxT( "]" );
 
@@ -93,11 +91,7 @@ void FOOTPRINT_WIZARD_FRAME::DisplayBuildMessage( wxString& aMessage )
 
 FOOTPRINT_WIZARD* FOOTPRINT_WIZARD_FRAME::GetMyWizard()
 {
-    if( m_wizardName.Length() == 0 )
-        return nullptr;
-
-    // TODO(JE)
-    return nullptr;
+    return m_currentWizard;
 }
 
 
@@ -116,22 +110,13 @@ void FOOTPRINT_WIZARD_FRAME::SelectFootprintWizard()
     if( wizardSelector.ShowModal() != wxID_OK )
         return;
 
-    FOOTPRINT_WIZARD* footprintWizard = wizardSelector.GetWizard();
+    m_currentWizard = nullptr;
+    wxString wizardIdentifier = wizardSelector.GetWizard();
 
-    if( footprintWizard )
+    if( !wizardIdentifier.IsEmpty() )
     {
-        // TODO(JE)
-#if 0
-        m_wizardName = footprintWizard->GetName();
-        m_wizardDescription = footprintWizard->GetDescription();
-
-        footprintWizard->ResetParameters();
-#endif
-    }
-    else
-    {
-        m_wizardName.Empty();
-        m_wizardDescription.Empty();
+        if( std::optional<FOOTPRINT_WIZARD*> wizard = Manager()->GetWizard( wizardIdentifier ) )
+            m_currentWizard = *wizard;
     }
 
     RegenerateFootprint();

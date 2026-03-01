@@ -102,7 +102,8 @@ FOOTPRINT_WIZARD_FRAME::FOOTPRINT_WIZARD_FRAME( KIWAY* aKiway, wxWindow* aParent
     icon.CopyFromBitmap( KiBitmap( BITMAPS::module_wizard ) );
     SetIcon( icon );
 
-    m_wizardName.Empty();
+    m_currentWizard = nullptr;
+    m_wizardManager = std::make_unique<FOOTPRINT_WIZARD_MANAGER>();
 
     // Create the GAL canvas.
     // Must be created before calling LoadSettings() that needs a valid GAL canvas
@@ -367,6 +368,8 @@ void FOOTPRINT_WIZARD_FRAME::OnActivate( wxActivateEvent& event )
         m_wizardListShown = true;
         wxPostEvent( this, wxCommandEvent( wxEVT_TOOL, ID_FOOTPRINT_WIZARD_SELECT_WIZARD ) );
     }
+
+    // TODO(JE) re-evaluate below
 #if 0
     // Currently, we do not have a way to see if a Python wizard has changed,
     // therefore the lists of parameters and option has to be rebuilt
@@ -385,8 +388,9 @@ void FOOTPRINT_WIZARD_FRAME::OnActivate( wxActivateEvent& event )
 
 void FOOTPRINT_WIZARD_FRAME::Update3DView( bool aMarkDirty, bool aRefresh, const wxString* aTitle )
 {
+    wxString wizardName = m_currentWizard ? m_currentWizard->Info().meta.name : _( "no wizard selected" );
     wxString frm3Dtitle;
-    frm3Dtitle.Printf( _( "ModView: 3D Viewer [%s]" ), m_wizardName );
+    frm3Dtitle.Printf( _( "3D Viewer [%s]" ), wizardName );
     PCB_BASE_FRAME::Update3DView( aMarkDirty, aRefresh, &frm3Dtitle );
 }
 
@@ -394,19 +398,4 @@ void FOOTPRINT_WIZARD_FRAME::Update3DView( bool aMarkDirty, bool aRefresh, const
 BOARD_ITEM_CONTAINER* FOOTPRINT_WIZARD_FRAME::GetModel() const
 {
     return GetBoard()->GetFirstFootprint();
-}
-
-
-void FOOTPRINT_WIZARD_FRAME::PythonPluginsReload()
-{
-    // Reload the Python plugins
-    // Because the board editor has also a plugin python menu,
-    // call the PCB_EDIT_FRAME RunAction() if the board editor is running
-    // Otherwise run the current RunAction().
-    PCB_EDIT_FRAME* pcbframe = static_cast<PCB_EDIT_FRAME*>( Kiway().Player( FRAME_PCB_EDITOR, false ) );
-
-    if( pcbframe )
-        pcbframe->GetToolManager()->RunAction( ACTIONS::pluginsReload );
-    else
-        GetToolManager()->RunAction( ACTIONS::pluginsReload );
 }

@@ -53,12 +53,6 @@ public:
 
     FOOTPRINT* GetBuiltFootprint();
 
-    /**
-     * Reload the Python plugins if they are newer than
-     * the already loaded, and load new plugins if any
-     */
-    void PythonPluginsReload();
-
     COLOR_SETTINGS* GetColorSettings( bool aForceRefresh = false ) const override;
 
     void SelectCurrentWizard( wxCommandEvent& aDummy ); // Open the wizard selector dialog
@@ -72,6 +66,8 @@ public:
 
     void RebuildWizardParameters();
     void OnWizardParametersChanged();
+
+    FOOTPRINT_WIZARD_MANAGER* Manager() const { return m_wizardManager.get(); }
 
 private:
     void                OnSize( wxSizeEvent& event ) override;
@@ -147,8 +143,7 @@ private:
     DECLARE_EVENT_TABLE()
 
 protected:
-    wxString        m_wizardName;           ///< name of the current wizard
-    wxString        m_wizardDescription;    ///< description of the wizard
+    FOOTPRINT_WIZARD* m_currentWizard;
     wxString        m_wizardStatus;         ///< current wizard status
 
 private:
@@ -160,7 +155,7 @@ private:
 
     bool            m_wizardListShown;      ///< A show-once flag for the wizard list
 
-
+    std::unique_ptr<FOOTPRINT_WIZARD_MANAGER> m_wizardManager;
 };
 
 

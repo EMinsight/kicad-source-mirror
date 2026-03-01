@@ -31,6 +31,7 @@ class FOOTPRINT_WIZARD;
 class PG_UNIT_EDITOR;
 class PG_CHECKBOX_EDITOR;
 class PG_RATIO_EDITOR;
+class WIZARD_PARAMETER;
 
 class FOOTPRINT_WIZARD_PROPERTIES_PANEL : public PROPERTIES_PANEL
 {
@@ -43,7 +44,8 @@ public:
     void RebuildParameters( FOOTPRINT_WIZARD* aWizard );
 
 protected:
-    wxPGProperty* createPGProperty( const PROPERTY_BASE* aProperty ) const override;
+    wxPGProperty* createPGProperty( const PROPERTY_BASE* aProperty ) const override { return nullptr; }
+    wxPGProperty* createPGProperty( const WIZARD_PARAMETER* aParam ) const;
     void valueChanged( wxPropertyGridEvent& aEvent ) override;
 
 private:

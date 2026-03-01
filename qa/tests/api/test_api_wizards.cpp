@@ -73,7 +73,7 @@ BOOST_AUTO_TEST_CASE( QueryWizards )
 
             FOOTPRINT_WIZARD wizard;
             wizard.SetIdentifier( action->identifier );
-            BOOST_TEST_REQUIRE( FOOTPRINT_WIZARD_MANAGER::RefreshInfo( wizard ) );
+            BOOST_TEST_REQUIRE( FOOTPRINT_WIZARD_MANAGER::RefreshInfo( &wizard ) );
 
             BOOST_TEST_REQUIRE( wizard.Info().meta.identifier.Matches( action->identifier ) );
         }

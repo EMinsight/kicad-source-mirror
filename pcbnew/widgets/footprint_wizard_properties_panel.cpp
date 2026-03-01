@@ -18,6 +18,8 @@
  * with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+#include <ranges>
+
 #include <widgets/footprint_wizard_properties_panel.h>
 
 #include <footprint_wizard.h>
@@ -38,7 +40,8 @@ FOOTPRINT_WIZARD_PROPERTIES_PANEL::FOOTPRINT_WIZARD_PROPERTIES_PANEL( wxWindow* 
         m_checkboxEditorInstance( nullptr ),
         m_ratioEditorInstance( nullptr )
 {
-    m_caption->SetLabel( _( "Parameters" ) );
+    // AUI panel caption is enough
+    m_caption->Hide();
 
     wxASSERT( wxPGGlobalVars );
 
@@ -94,15 +97,103 @@ void FOOTPRINT_WIZARD_PROPERTIES_PANEL::UpdateData()
 }
 
 
-wxPGProperty* FOOTPRINT_WIZARD_PROPERTIES_PANEL::createPGProperty( const PROPERTY_BASE* ) const
+void FOOTPRINT_WIZARD_PROPERTIES_PANEL::RebuildParameters( FOOTPRINT_WIZARD* aWizard )
 {
-    return new wxPropertyCategory();
+    SUPPRESS_GRID_CHANGED_EVENTS raii( this );
+
+    if( m_grid->IsEditorFocused() )
+        m_grid->CommitChangesFromEditor();
+
+    m_grid->Clear();
+
+    if( !aWizard )
+        return;
+
+    std::map<kiapi::common::types::WizardParameterCategory, std::vector<WIZARD_PARAMETER*>> params;
+
+    for( const std::unique_ptr<WIZARD_PARAMETER>& param : aWizard->Info().parameters )
+        params[param->category].emplace_back( param.get() );
+
+    for( kiapi::common::types::WizardParameterCategory category : params | std::views::keys )
+    {
+        auto groupItem = new wxPropertyCategory( WIZARD_PARAMETER::ParameterCategoryName( category ) );
+        m_grid->Append( groupItem );
+
+        for( WIZARD_PARAMETER* param : params[category] )
+        {
+            if( wxPGProperty* prop = createPGProperty( param ) )
+                m_grid->Append( prop );
+        }
+    }
+
+    RecalculateSplitterPos();
 }
 
 
-void FOOTPRINT_WIZARD_PROPERTIES_PANEL::RebuildParameters( FOOTPRINT_WIZARD* aWizard )
+wxPGProperty* FOOTPRINT_WIZARD_PROPERTIES_PANEL::createPGProperty( const WIZARD_PARAMETER* aParam ) const
 {
-    // TODO
+    wxPGProperty* ret = nullptr;
+
+    switch( aParam->type )
+    {
+    case kiapi::common::types::WPDT_DISTANCE:
+        ret = new PGPROPERTY_SIZE( m_frame );
+        ret->SetEditor( PG_UNIT_EDITOR::BuildEditorName( m_frame ) );
+        break;
+
+    case kiapi::common::types::WPDT_AREA:
+        ret = new PGPROPERTY_AREA( m_frame );
+        ret->SetEditor( PG_UNIT_EDITOR::BuildEditorName( m_frame ) );
+        break;
+
+    case kiapi::common::types::WPDT_VOLUME:
+        wxASSERT_MSG( false, "Volume properties are not currently implemented" );
+        break;
+
+    case kiapi::common::types::WPDT_TIME:
+        ret = new wxFloatProperty();
+        break;
+
+    case kiapi::common::types::WPDT_ANGLE:
+        ret = new PGPROPERTY_ANGLE();;
+        ret->SetEditor( PG_UNIT_EDITOR::BuildEditorName( m_frame ) );
+        break;
+
+    case kiapi::common::types::WPDT_STRING:
+        ret = new PGPROPERTY_STRING();
+        break;
+
+    case kiapi::common::types::WPDT_INTEGER:
+        ret = new wxIntProperty();
+        break;
+
+    case kiapi::common::types::WPDT_REAL:
+        ret = new wxFloatProperty();
+        break;
+
+    case kiapi::common::types::WPDT_BOOL:
+        ret = new PGPROPERTY_BOOL();
+        break;
+
+    // TODO(JE) consider supporting enum properties
+
+    case kiapi::common::types::WPDT_UNKNOWN:
+    default:
+        break;
+    }
+
+    if( ret )
+    {
+        ret->SetLabel( wxGetTranslation( aParam->name ) );
+        ret->SetName( aParam->name );
+        ret->SetHelpString( wxGetTranslation( aParam->description ) );
+        ret->SetClientData( const_cast<WIZARD_PARAMETER*>( aParam ) );
+
+        if( auto concrete = dynamic_cast<const WIZARD_INT_PARAMETER*>( aParam ) )
+            ret->SetValue( concrete->value );
+    }
+
+    return ret;
 }
 
 

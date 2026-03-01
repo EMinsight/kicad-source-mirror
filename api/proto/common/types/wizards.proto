@@ -32,12 +32,14 @@ enum WizardParameterDataType
   WPDT_UNKNOWN = 0;
   WPDT_DISTANCE = 1;  // int32 nanometers
   WPDT_AREA = 2;      // int32 square nanometers
-  WPDT_VOLUME = 3;    // int32 cubic nanometers
+  WPDT_VOLUME = 3;    // int32 cubic nanometers (not currently supported in KiCad)
   WPDT_TIME = 4;      // int32 picoseconds
   WPDT_ANGLE = 5;     // double degrees
   WPDT_STRING = 6;
   WPDT_INTEGER = 7;   // int32 (quantity, etc)
   WPDT_REAL = 8;      // double value
+  WPDT_BOOL = 9;      // boolean flag
+  // TODO(JE) consider supporting enums
 }
 
 enum WizardParameterCategory
@@ -50,17 +52,56 @@ enum WizardParameterCategory
   WPC_RULES = 5;
 }
 
+message WizardIntParameter
+{
+  int32 value = 1;
+  int32 default = 2;
+  optional int32 min = 3;
+  optional int32 max = 4;
+
+  // If present, will require the value to be a multiple of this number
+  optional int32 multiple = 5;
+}
+
+message WizardRealParameter
+{
+  double value = 1;
+  double default = 2;
+  optional double min = 3;
+  optional double max = 4;
+}
+
+message WizardBoolParameter
+{
+  bool value = 1;
+  bool default = 2;
+}
+
+message WizardStringParameter
+{
+  string value = 1;
+  string default = 2;
+  optional string validation_regex = 3;
+}
+
 message WizardParameter
 {
+  // An internal identifier for this parameter; must be unique within a wizard
   string identifier = 1;
+
+  // The human-readable name for this parameter (may be translated)
   string name = 2;
+
+  // A human-readable description / tooltip string (may be translated)
   string description = 3;
+
   WizardParameterCategory category = 4;
   WizardParameterDataType type = 5;
   oneof value {
-    int32 int_value = 6;
-    double double_value = 7;
-    string string_value = 8;
+    WizardIntParameter int = 6;
+    WizardRealParameter real = 7;
+    WizardBoolParameter bool = 8;
+    WizardStringParameter string = 9;
   }
 }
 

@@ -21,6 +21,7 @@
 #ifndef FOOTPRINT_WIZARD_H
 #define FOOTPRINT_WIZARD_H
 
+#include <optional>
 #include <tl/expected.hpp>
 
 #include <api/common/types/wizards.pb.h>
@@ -38,11 +39,70 @@ struct WIZARD_META_INFO
     void FromProto( const kiapi::common::types::WizardMetaInfo& aProto );
 };
 
+class WIZARD_PARAMETER
+{
+public:
+    WIZARD_PARAMETER() = default;
+    virtual ~WIZARD_PARAMETER() = default;
+
+    wxString identifier;
+    wxString name;
+    wxString description;
+    kiapi::common::types::WizardParameterCategory category = kiapi::common::types::WPC_UNKNOWN;
+    kiapi::common::types::WizardParameterDataType type = kiapi::common::types::WPDT_UNKNOWN;
+
+    static std::unique_ptr<WIZARD_PARAMETER> Create( const kiapi::common::types::WizardParameter& aProto );
+
+    static wxString ParameterCategoryName( kiapi::common::types::WizardParameterCategory aCategory );
+};
+
+class WIZARD_INT_PARAMETER : public WIZARD_PARAMETER
+{
+public:
+    int value = 0;
+    int default_value = 0;
+    std::optional<int> min;
+    std::optional<int> max;
+    std::optional<int> multiple;
+
+    void FromProto( const kiapi::common::types::WizardIntParameter& aProto );
+};
+
+class WIZARD_REAL_PARAMETER : public WIZARD_PARAMETER
+{
+public:
+    double value = 0.0;
+    double default_value = 0.0;
+    std::optional<double> min;
+    std::optional<double> max;
+
+    void FromProto( const kiapi::common::types::WizardRealParameter& aProto );
+};
+
+struct WIZARD_BOOL_PARAMETER : public WIZARD_PARAMETER
+{
+public:
+    bool value = false;
+    bool default_value = false;
+
+    void FromProto( const kiapi::common::types::WizardBoolParameter& aProto );
+};
+
+class WIZARD_STRING_PARAMETER : public WIZARD_PARAMETER
+{
+public:
+    wxString value;
+    wxString default_value;
+    std::optional<wxString> validation_regex;
+
+    void FromProto( const kiapi::common::types::WizardStringParameter& aProto );
+};
+
 // Wrapper for WizardInfo protobuf
 struct WIZARD_INFO
 {
     WIZARD_META_INFO meta;
-    std::vector<kiapi::common::types::WizardParameter> parameters;
+    std::vector<std::unique_ptr<WIZARD_PARAMETER>> parameters;
 
     void FromProto( const kiapi::common::types::WizardInfo& aProto );
 };
@@ -79,18 +139,29 @@ public:
     FOOTPRINT_WIZARD_MANAGER() {}
     ~FOOTPRINT_WIZARD_MANAGER() = default;
 
+    /**
+     * Goes through the list of IPC API plugins that provide wizard actions and
+     * attempts to refresh the info of each one, placing the ones that work in to
+     * the internal list returned by Wizards().  Note that doing so clears the existing
+     * list and invalidates any existing pointers to wizards.
+     */
     void ReloadWizards();
+
+    std::optional<FOOTPRINT_WIZARD*> GetWizard( const wxString& aIdentifier );
+
+    std::vector<FOOTPRINT_WIZARD*> Wizards() const;
 
     /**
      * Runs a wizard plugin with the --get-info argument, which should result in the plugin
      * dumping a WizardInfo protobuf message in JSON format to stdout.
      * @return true if the call succeeded
      */
-    static bool RefreshInfo( FOOTPRINT_WIZARD& aWizard );
+    static bool RefreshInfo( FOOTPRINT_WIZARD* aWizard );
 
 private:
 
-    std::vector<FOOTPRINT_WIZARD> m_wizards;
+    // Loaded wizards, mapped by identifier
+    std::map<wxString, std::unique_ptr<FOOTPRINT_WIZARD>> m_wizards;
 };
 
 

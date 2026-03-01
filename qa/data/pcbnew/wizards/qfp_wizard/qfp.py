@@ -27,7 +27,15 @@ from google.protobuf.json_format import MessageToJson
 
 from kipy.board_types import BoardLayer, BoardRectangle, BoardText, Footprint
 from kipy.geometry import Vector2
-from kipy.wizards import WizardContentType, WizardInfo, WizardMetaInfo
+from kipy.util.units import from_mm
+from kipy.wizards import (
+    WizardContentType,
+    WizardInfo,
+    WizardMetaInfo,
+    WizardParameter,
+    WizardParameterCategory,
+    WizardParameterDataType,
+)
 
 def build_wizard_info() -> WizardInfo:
     info = WizardInfo()
@@ -36,7 +44,81 @@ def build_wizard_info() -> WizardInfo:
     info.meta.name = "QFP"
     info.meta.description = "Quad Flat Package (QFP) footprint wizard"
     info.meta.types_generated = [WizardContentType.WCT_FOOTPRINT]
-    info.parameters = []
+    info.parameters = [
+        WizardParameter.create(
+            "n",
+            "Pad Count",
+            WizardParameterCategory.WPC_PADS,
+            WizardParameterDataType.WPDT_INTEGER,
+            32,
+            min_value=4,
+            multiple=4,
+        ),
+        WizardParameter.create(
+            "e",
+            "Pad Pitch",
+            WizardParameterCategory.WPC_PADS,
+            WizardParameterDataType.WPDT_DISTANCE,
+            from_mm(0.8),
+        ),
+        WizardParameter.create(
+            "X1",
+            "Pad Width",
+            WizardParameterCategory.WPC_PADS,
+            WizardParameterDataType.WPDT_DISTANCE,
+            from_mm(0.55),
+        ),
+        WizardParameter.create(
+            "Y1",
+            "Pad Length",
+            WizardParameterCategory.WPC_PADS,
+            WizardParameterDataType.WPDT_DISTANCE,
+            from_mm(1.5),
+        ),
+        WizardParameter.create(
+            "C1",
+            "Horizontal spacing",
+            WizardParameterCategory.WPC_PADS,
+            WizardParameterDataType.WPDT_DISTANCE,
+            from_mm(8.4),
+        ),
+        WizardParameter.create(
+            "C2",
+            "Vertical spacing",
+            WizardParameterCategory.WPC_PADS,
+            WizardParameterDataType.WPDT_DISTANCE,
+            from_mm(8.4),
+        ),
+        WizardParameter.create(
+            "oval",
+            "Oval Pads",
+            WizardParameterCategory.WPC_PADS,
+            WizardParameterDataType.WPDT_BOOL,
+            True,
+        ),
+        WizardParameter.create(
+            "D1",
+            "Overall Width",
+            WizardParameterCategory.WPC_PACKAGE,
+            WizardParameterDataType.WPDT_DISTANCE,
+            from_mm(7),
+        ),
+        WizardParameter.create(
+            "E1",
+            "Overall Height",
+            WizardParameterCategory.WPC_PACKAGE,
+            WizardParameterDataType.WPDT_DISTANCE,
+            from_mm(7),
+        ),
+        WizardParameter.create(
+            "courtyard_margin",
+            "Courtyard Margin",
+            WizardParameterCategory.WPC_PACKAGE,
+            WizardParameterDataType.WPDT_DISTANCE,
+            from_mm(0.25),
+            min_value=from_mm(0.2),
+        ),
+    ]
     return info
 
 
@@ -87,5 +169,3 @@ if __name__ == "__main__":
             preserving_proto_field_name=True,
         )
         print(json)
-
-    sys.exit(0)
