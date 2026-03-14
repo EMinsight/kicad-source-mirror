@@ -38,6 +38,7 @@ set( QA_PCBNEW_SRCS
     test_barcode_load_save.cpp
     test_board_connected_items.cpp
     test_board_design_settings.cpp
+    test_board_loader.cpp
     test_board_item.cpp
     test_board_commit.cpp
     test_board_statistics.cpp

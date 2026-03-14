@@ -33,6 +33,7 @@
 #include "pcbnew_scripting_helpers.h"
 
 #include <action_plugin.h>
+#include <board_loader.h>
 #include <board.h>
 #include <board_design_settings.h>
 #include <settings/common_settings.h>
@@ -182,57 +183,20 @@ BOARD* LoadBoard( const wxString& aFileName, PCB_IO_MGR::PCB_FILE_T aFormat, boo
     if( !project )
         project = GetDefaultProject();
 
-    BASE_SCREEN::m_DrawingSheetFileName = project->GetProjectFile().m_BoardDrawingSheetFile;
-
-    BOARD* brd = nullptr;
     try
     {
-        brd = PCB_IO_MGR::Load( aFormat, aFileName );
-    }
-    catch( ... )
-    {
-        brd = nullptr;
-    }
+        BOARD_LOADER::OPTIONS opts;
+        opts.drawing_sheet_error_callback =
+                []( const wxString& aSheetName, const wxString& aError )
+                {
+                    wxFprintf( stderr, _( "Error loading drawing sheet '%s': %s" ),
+                               aSheetName, aError );
+                };
 
-    if( brd )
-    {
-        // Load the drawing sheet from the filename stored in BASE_SCREEN::m_DrawingSheetFileName.
-        // If empty, or not existing, the default drawing sheet is loaded.
-        FILENAME_RESOLVER resolver;
-        resolver.SetProject( project );
+        std::unique_ptr<BOARD> brd = BOARD_LOADER::Load( aFileName, aFormat, project, opts );
 
-        // a PGM_BASE* process can be nullptr when running from a python script
-        // So use PgmOrNull() instead of &Pgm() to initialize the resolver
-        resolver.SetProgramBase( PgmOrNull() );
-
-        wxString filename = resolver.ResolvePath( BASE_SCREEN::m_DrawingSheetFileName,
-                                                  project->GetProjectPath(),
-                                                  { brd->GetEmbeddedFiles() } );
-
-        wxString msg;
-
-        if( !DS_DATA_MODEL::GetTheInstance().LoadDrawingSheet( filename, &msg ) )
-        {
-            wxFprintf( stderr, _( "Error loading drawing sheet '%s': %s" ),
-                       BASE_SCREEN::m_DrawingSheetFileName, msg );
-        }
-
-        // JEY TODO: move this global to the board
-        ENUM_MAP<PCB_LAYER_ID>& layerEnum = ENUM_MAP<PCB_LAYER_ID>::Instance();
-
-        layerEnum.Choices().Clear();
-        layerEnum.Undefined( UNDEFINED_LAYER );
-
-        for( PCB_LAYER_ID layer : LSET::AllLayersMask() )
-        {
-            // Canonical name
-            layerEnum.Map( layer, LSET::Name( layer ) );
-
-            // User name
-            layerEnum.Map( layer, brd->GetLayerName( layer ) );
-        }
-
-        brd->SetProject( project );
+        if( !brd )
+            return nullptr;
 
         // Move legacy view settings to local project settings
         if( !brd->m_LegacyVisibleLayers.test( Rescue ) )
@@ -241,30 +205,12 @@ BOARD* LoadBoard( const wxString& aFileName, PCB_IO_MGR::PCB_FILE_T aFormat, boo
         if( !brd->m_LegacyVisibleItems.test( GAL_LAYER_INDEX( GAL_LAYER_ID_BITMASK_END ) ) )
             project->GetLocalSettings().m_VisibleItems = brd->m_LegacyVisibleItems;
 
-        BOARD_DESIGN_SETTINGS& bds = brd->GetDesignSettings();
-        bds.m_DRCEngine = std::make_shared<DRC_ENGINE>( brd, &bds );
-
-        try
-        {
-            wxFileName rules = pro;
-            rules.SetExt( FILEEXT::DesignRulesFileExtension );
-            bds.m_DRCEngine->InitEngine( rules );
-        }
-        catch( ... )
-        {
-            // Best efforts...
-        }
-
-        for( PCB_MARKER* marker : brd->ResolveDRCExclusions( true ) )
-            brd->Add( marker );
-
-        brd->BuildConnectivity();
-        brd->BuildListOfNets();
-        brd->SynchronizeNetsAndNetClasses( true );
-        brd->UpdateUserUnits( brd, nullptr );
+        return brd.release();
     }
-
-    return brd;
+    catch( ... )
+    {
+        return nullptr;
+    }
 }
 
 

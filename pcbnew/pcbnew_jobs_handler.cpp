@@ -28,6 +28,7 @@
 #include <nlohmann/json.hpp>
 
 #include "pcbnew_jobs_handler.h"
+#include <board_loader.h>
 #include <board_commit.h>
 #include <board_design_settings.h>
 #include <drc/drc_engine.h>
@@ -419,6 +420,59 @@ TOOL_MANAGER* PCBNEW_JOBS_HANDLER::getToolManager( BOARD* aBrd )
 BOARD* PCBNEW_JOBS_HANDLER::getBoard( const wxString& aPath )
 {
     BOARD* brd = nullptr;
+    SETTINGS_MANAGER& settingsManager = Pgm().GetSettingsManager();
+
+    auto getProjectForBoard =
+            [&]( const wxString& aBoardPath ) -> PROJECT*
+            {
+                wxFileName pro = aBoardPath;
+                pro.SetExt( FILEEXT::ProjectFileExtension );
+                pro.MakeAbsolute();
+
+                PROJECT* project = settingsManager.GetProject( pro.GetFullPath() );
+
+                if( !project && wxFileExists( pro.GetFullPath() ) )
+                {
+                    settingsManager.LoadProject( pro.GetFullPath(), true );
+                    project = settingsManager.GetProject( pro.GetFullPath() );
+                }
+
+                if( !project )
+                {
+                    project = settingsManager.GetProject( "" );
+
+                    if( !project )
+                    {
+                        settingsManager.LoadProject( "" );
+                        project = settingsManager.GetProject( "" );
+                    }
+                }
+
+                return project;
+            };
+
+    auto loadBoardFromPath =
+            [&]( const wxString& aBoardPath ) -> BOARD*
+            {
+                PROJECT* project = getProjectForBoard( aBoardPath );
+
+                PCB_IO_MGR::PCB_FILE_T pluginType =
+                        PCB_IO_MGR::FindPluginTypeFromBoardPath( aBoardPath, KICTL_KICAD_ONLY );
+
+                if( !project || pluginType == PCB_IO_MGR::FILE_TYPE_NONE )
+                    return nullptr;
+
+                try
+                {
+                    std::unique_ptr<BOARD> loadedBoard = BOARD_LOADER::Load( aBoardPath, pluginType,
+                                                                             project );
+                    return loadedBoard.release();
+                }
+                catch ( ... )
+                {
+                    return nullptr;
+                }
+            };
 
     if( !Pgm().IsGUI() && Pgm().GetSettingsManager().IsProjectOpen() )
     {
@@ -433,7 +487,7 @@ BOARD* PCBNEW_JOBS_HANDLER::getBoard( const wxString& aPath )
         }
 
         if( !m_cliBoard )
-            m_cliBoard = LoadBoard( pcbPath, true );
+            m_cliBoard = loadBoardFromPath( pcbPath );
 
         brd = m_cliBoard;
     }
@@ -446,7 +500,7 @@ BOARD* PCBNEW_JOBS_HANDLER::getBoard( const wxString& aPath )
     }
     else
     {
-        brd = LoadBoard( aPath, true );
+        brd = loadBoardFromPath( aPath );
     }
 
     if( !brd )
@@ -2353,6 +2407,7 @@ int PCBNEW_JOBS_HANDLER::JobExportDrc( JOB* aJob )
         else
         {
             wxFileName schematicPath( drcJob->m_filename );
+            schematicPath.MakeAbsolute();
             schematicPath.SetExt( FILEEXT::KiCadSchematicFileExtension );
 
             if( !schematicPath.Exists() )

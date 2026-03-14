@@ -385,6 +385,7 @@ set( PCBNEW_CLASS_SRCS
 
     action_plugin.cpp
     array_pad_number_provider.cpp
+    board_loader.cpp
     board_statistics.cpp
     board_statistics_report.cpp
     board_tables/board_characteristics_table.cpp
