@@ -19,6 +19,7 @@
  */
 
 #include <csignal>
+#include <atomic>
 
 #include <api/api_handler_common.h>
 #include <api/api_server.h>
@@ -35,10 +36,11 @@
 #define ARG_SOCKET "--socket"
 
 
+std::atomic_bool g_apiServerExitRequested{ false };
+
 void apiServerSignalHandler( int )
 {
-    if( wxTheApp )
-        wxTheApp->ExitMainLoop();
+    g_apiServerExitRequested.store( true );
 }
 
 
@@ -263,7 +265,13 @@ int CLI::API_SERVER_COMMAND::doPerform( KIWAY& aKiway )
     auto oldSigTerm = std::signal( SIGTERM, apiServerSignalHandler );
 #endif
 
-    wxTheApp->MainLoop();
+    g_apiServerExitRequested.store( false );
+
+    while( !g_apiServerExitRequested.load() )
+    {
+        wxTheApp->ProcessPendingEvents();
+        wxMilliSleep( 10 );
+    }
 
     std::signal( SIGINT, oldSigInt );
 #ifdef SIGTERM

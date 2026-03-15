@@ -93,6 +93,8 @@ private:
      */
     void handleApiEvent( wxCommandEvent& aEvent );
 
+    void handleApiRequestString( std::string& aRequestString );
+
     void log( const std::string& aOutput );
 
     std::unique_ptr<KINNG_REQUEST_SERVER> m_server;
