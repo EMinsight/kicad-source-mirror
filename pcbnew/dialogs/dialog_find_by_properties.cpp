@@ -444,7 +444,7 @@ void DIALOG_FIND_BY_PROPERTIES::rebuildPropertyGrid()
 
     for( auto& [name, property] : commonProps )
     {
-        if( property->IsHiddenFromPropertiesManager() )
+        if( property->IsHiddenFromPropertiesManager() && name != wxS( "Type" ) )
             continue;
 
         if( property->IsHiddenFromDesignEditors() )
