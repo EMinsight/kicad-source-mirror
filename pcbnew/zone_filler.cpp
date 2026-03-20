@@ -27,6 +27,7 @@
 #include <future>
 #include <hash.h>
 #include <set>
+#include <unordered_map>
 #include <unordered_set>
 #include <core/kicad_algo.h>
 #include <advanced_config.h>
@@ -51,7 +52,7 @@
 #include <geometry/convex_hull.h>
 #include <geometry/geometry_utils.h>
 #include <geometry/vertex_set.h>
-#include <geometry/poly_containment_index.h>
+#include <geometry/poly_ystripes_index.h>
 #include <kidialog.h>
 #include <thread_pool.h>
 #include <math/util.h>      // for KiROUND
@@ -435,6 +436,18 @@ bool ZONE_FILLER::Fill( const std::vector<ZONE*>& aZones, bool aCheck, wxWindow*
 
     LSET boardCuMask = LSET::AllCuMask( m_board->GetCopperLayerCount() );
 
+    // Pre-build Y-stripe spatial indices for zone outline containment queries.
+    // Amortizes build cost across the thousands of via/pad flash checks below.
+    std::unordered_map<const ZONE*, POLY_YSTRIPES_INDEX> zoneOutlineIndices;
+
+    for( ZONE* zone : m_board->Zones() )
+    {
+        if( zone->GetNumCorners() <= 2 )
+            continue;
+
+        zoneOutlineIndices[zone].Build( *zone->Outline() );
+    }
+
     auto findHighestPriorityZone =
             [&]( const BOX2I& bbox, PCB_LAYER_ID itemLayer, int netcode,
                  const std::function<bool( const ZONE* )>& testFn ) -> ZONE*
@@ -500,7 +513,9 @@ bool ZONE_FILLER::Fill( const std::vector<ZONE*>& aZones, bool aCheck, wxWindow*
                     if( !zone->GetBoundingBox().Intersects( bbox ) )
                         continue;
 
-                    if( zone->Outline()->Contains( testPoint ) )
+                    auto it = zoneOutlineIndices.find( zone );
+
+                    if( it != zoneOutlineIndices.end() && it->second.Contains( testPoint ) )
                         return true;
                 }
 
@@ -582,6 +597,11 @@ bool ZONE_FILLER::Fill( const std::vector<ZONE*>& aZones, bool aCheck, wxWindow*
             auto padTestFn =
                     [&]( const ZONE* aZone ) -> bool
                     {
+                        auto it = zoneOutlineIndices.find( aZone );
+
+                        if( it != zoneOutlineIndices.end() )
+                            return it->second.Contains( center );
+
                         return aZone->Outline()->Contains( center );
                     };
 
@@ -1261,7 +1281,7 @@ bool ZONE_FILLER::Fill( const std::vector<ZONE*>& aZones, bool aCheck, wxWindow*
     struct INDEXED_ZONE
     {
         BOX2I                                       bbox;
-        std::unique_ptr<POLY_CONTAINMENT_INDEX>     index;
+        std::unique_ptr<POLY_YSTRIPES_INDEX>        index;
     };
 
     struct NET_LAYER_HASH
@@ -1291,8 +1311,8 @@ bool ZONE_FILLER::Fill( const std::vector<ZONE*>& aZones, bool aCheck, wxWindow*
                 continue;
 
             INDEXED_ZONE iz;
-            iz.bbox = zone->GetBoundingBox();
-            iz.index = std::make_unique<POLY_CONTAINMENT_INDEX>();
+            iz.bbox = fill->BBox();
+            iz.index = std::make_unique<POLY_YSTRIPES_INDEX>();
             iz.index->Build( *fill );
             filledZonesByNetLayer[{ zone->GetNetCode(), layer }].push_back( std::move( iz ) );
         }
@@ -2653,7 +2673,6 @@ bool ZONE_FILLER::fillCopperZone( const ZONE* aZone, PCB_LAYER_ID aLayer, PCB_LA
 
     // Create a temporary zone that we can hit-test spoke-ends against.  It's only temporary
     // because the "real" subtract-clearance-holes has to be done after the spokes are added.
-    static const bool USE_BBOX_CACHES = true;
     SHAPE_POLY_SET testAreas = aFillPolys.CloneDropTriangulation();
     testAreas.BooleanSubtract( clearanceHoles );
     DUMP_POLYS_TO_COPPER_LAYER( testAreas, In4_Cu, wxT( "minus-clearance-holes" ) );
@@ -2671,9 +2690,10 @@ bool ZONE_FILLER::fillCopperZone( const ZONE* aZone, PCB_LAYER_ID aLayer, PCB_LA
     if( m_progressReporter && m_progressReporter->IsCancelled() )
         return false;
 
-    // Spoke-end-testing is hugely expensive so we generate cached bounding-boxes to speed
-    // things up a bit.
-    testAreas.BuildBBoxCaches();
+    // Build a Y-stripe spatial index for O(sqrt(V)) spoke endpoint containment queries
+    // instead of O(V) brute-force ray-casting with bbox caches.
+    POLY_YSTRIPES_INDEX spokeTestIndex;
+    spokeTestIndex.Build( testAreas );
     int interval = 0;
 
     SHAPE_POLY_SET debugSpokes;
@@ -2683,7 +2703,7 @@ bool ZONE_FILLER::fillCopperZone( const ZONE* aZone, PCB_LAYER_ID aLayer, PCB_LA
         const VECTOR2I& testPt = spoke.CPoint( 3 );
 
         // Hit-test against zone body
-        if( testAreas.Contains( testPt, -1, 1, USE_BBOX_CACHES ) )
+        if( spokeTestIndex.Contains( testPt, 1 ) )
         {
             if( m_debugZoneFiller )
                 debugSpokes.AddOutline( spoke );
@@ -2706,8 +2726,8 @@ bool ZONE_FILLER::fillCopperZone( const ZONE* aZone, PCB_LAYER_ID aLayer, PCB_LA
             // Hit test in both directions to avoid interactions with round-off errors.
             // (See https://gitlab.com/kicad/code/kicad/-/issues/13316.)
             if( &other != &spoke
-                && other.PointInside( testPt, 1, USE_BBOX_CACHES )
-                && spoke.PointInside( other.CPoint( 3 ), 1, USE_BBOX_CACHES ) )
+                && other.PointInside( testPt, 1 )
+                && spoke.PointInside( other.CPoint( 3 ), 1 ) )
             {
                 if( m_debugZoneFiller )
                     debugSpokes.AddOutline( spoke );
