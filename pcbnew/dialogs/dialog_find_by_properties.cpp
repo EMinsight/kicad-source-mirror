@@ -45,6 +45,7 @@
 #include <wx/grid.h>
 #include <wx/stc/stc.h>
 #include <wx/msgdlg.h>
+#include <wx/regex.h>
 
 #include <algorithm>
 
@@ -185,6 +186,186 @@ wxVariant DIALOG_FIND_BY_PROPERTIES::getVariantAwareValue( EDA_ITEM* aItem, PROP
 }
 
 
+namespace
+{
+wxVariant getFootprintFieldValue( FOOTPRINT* aFootprint, const wxString& aFieldName )
+{
+    PCB_FIELD* field = aFootprint ? aFootprint->GetField( aFieldName ) : nullptr;
+
+    if( !field )
+        return wxVariant();
+
+    wxString variantName;
+
+    if( aFootprint->GetBoard() )
+        variantName = aFootprint->GetBoard()->GetCurrentVariant();
+
+    if( !variantName.IsEmpty() )
+    {
+        if( const FOOTPRINT_VARIANT* variant = aFootprint->GetVariant( variantName );
+            variant && variant->HasFieldValue( aFieldName ) )
+        {
+            return wxVariant( aFootprint->GetFieldValueForVariant( variantName, aFieldName ) );
+        }
+    }
+
+    return wxVariant( field->GetText() );
+}
+
+
+std::set<wxString> getCommonFootprintFieldNames( const PCB_SELECTION& aSelection )
+{
+    std::set<wxString> commonFieldNames;
+    bool               firstFootprint = true;
+
+    for( EDA_ITEM* item : aSelection )
+    {
+        if( item->Type() != PCB_FOOTPRINT_T )
+            return {};
+
+        FOOTPRINT*         footprint = static_cast<FOOTPRINT*>( item );
+        std::set<wxString> fieldNames;
+
+        for( PCB_FIELD* field : footprint->GetFields() )
+        {
+            if( field )
+                fieldNames.insert( field->GetCanonicalName() );
+        }
+
+        if( firstFootprint )
+        {
+            commonFieldNames = std::move( fieldNames );
+            firstFootprint = false;
+        }
+        else
+        {
+            std::erase_if( commonFieldNames,
+                           [&]( const wxString& aName )
+                           {
+                               return !fieldNames.count( aName );
+                           } );
+        }
+    }
+
+    return commonFieldNames;
+}
+
+
+bool isExprIdentChar( wxChar aCh )
+{
+    return wxIsalnum( aCh ) || aCh == wxT( '_' );
+}
+
+
+std::set<wxString> getQueryableFootprintFieldNames( const std::vector<PROPERTY_ROW_DATA>& aRows )
+{
+    std::set<wxString> fieldNames = { _HKI( "Reference" ), _HKI( "Value" ), _HKI( "Datasheet" ),
+                                      _HKI( "Description" ) };
+
+    for( const PROPERTY_ROW_DATA& row : aRows )
+    {
+        if( row.property == nullptr )
+            fieldNames.insert( row.propertyName );
+    }
+
+    return fieldNames;
+}
+
+
+bool matchAliasAt( const wxString& aExpression, size_t aPos, const wxString& aAlias )
+{
+    if( aPos + aAlias.length() > aExpression.length() )
+        return false;
+
+    if( aExpression.Mid( aPos, aAlias.length() ) != aAlias )
+        return false;
+
+    if( aPos > 0 && isExprIdentChar( aExpression[aPos - 1] ) )
+        return false;
+
+    size_t end = aPos + aAlias.length();
+
+    if( end < aExpression.length() && isExprIdentChar( aExpression[end] ) )
+        return false;
+
+    return true;
+}
+
+
+wxString normalizeQueryFieldAliases( const wxString& aExpression, const std::vector<PROPERTY_ROW_DATA>& aRows )
+{
+    struct FIELD_ALIAS
+    {
+        wxString from;
+        wxString to;
+    };
+
+    std::vector<FIELD_ALIAS> aliases;
+
+    for( const wxString& fieldName : getQueryableFootprintFieldNames( aRows ) )
+    {
+        wxString exprName = fieldName;
+        exprName.Replace( wxT( " " ), wxT( "_" ) );
+
+        wxString escapedFieldName = fieldName;
+        escapedFieldName.Replace( wxT( "'" ), wxT( "\\'" ) );
+
+        aliases.push_back(
+                { wxT( "A." ) + exprName, wxString::Format( wxT( "A.getField('%s')" ), escapedFieldName ) } );
+
+        aliases.push_back(
+                { wxT( "B." ) + exprName, wxString::Format( wxT( "B.getField('%s')" ), escapedFieldName ) } );
+    }
+
+    std::sort( aliases.begin(), aliases.end(),
+               []( const FIELD_ALIAS& aLhs, const FIELD_ALIAS& aRhs )
+               {
+                   return aLhs.from.length() > aRhs.from.length();
+               } );
+
+    wxString normalized;
+    bool     inString = false;
+
+    for( size_t i = 0; i < aExpression.length(); )
+    {
+        wxChar ch = aExpression[i];
+
+        if( ch == wxT( '\'' ) && ( i == 0 || aExpression[i - 1] != wxT( '\\' ) ) )
+        {
+            inString = !inString;
+            normalized += ch;
+            ++i;
+            continue;
+        }
+
+        if( !inString )
+        {
+            bool replaced = false;
+
+            for( const FIELD_ALIAS& alias : aliases )
+            {
+                if( matchAliasAt( aExpression, i, alias.from ) )
+                {
+                    normalized += alias.to;
+                    i += alias.from.length();
+                    replaced = true;
+                    break;
+                }
+            }
+
+            if( replaced )
+                continue;
+        }
+
+        normalized += ch;
+        ++i;
+    }
+
+    return normalized;
+}
+} // namespace
+
+
 void DIALOG_FIND_BY_PROPERTIES::rebuildPropertyGrid()
 {
     PCB_SELECTION_TOOL*  selTool = m_frame->GetToolManager()->GetTool<PCB_SELECTION_TOOL>();
@@ -280,6 +461,53 @@ void DIALOG_FIND_BY_PROPERTIES::rebuildPropertyGrid()
             }
 
             wxVariant value = getVariantAwareValue( item, itemProp );
+
+            if( value.IsNull() )
+            {
+                available = false;
+                break;
+            }
+
+            if( first )
+            {
+                row.rawValue = value;
+                first = false;
+            }
+            else if( !different && !row.rawValue.IsNull() && value != row.rawValue )
+            {
+                different = true;
+                row.rawValue.MakeNull();
+            }
+        }
+
+        if( !available )
+            continue;
+
+        row.isMixed = different;
+        row.displayValue = different ? wxString( wxT( "<...>" ) )
+                                     : ( row.rawValue.IsNull() ? wxString( wxEmptyString ) : row.rawValue.GetString() );
+
+        m_propertyRows.push_back( row );
+    }
+
+    for( const wxString& fieldName : getCommonFootprintFieldNames( selection ) )
+    {
+        if( commonProps.count( fieldName ) )
+            continue;
+
+        PROPERTY_ROW_DATA row;
+        row.propertyName = fieldName;
+        row.property = nullptr;
+        row.matchMode = PROPERTY_MATCH_MODE::IGNORED;
+        row.isMixed = false;
+
+        bool first = true;
+        bool different = false;
+        bool available = true;
+
+        for( EDA_ITEM* item : selection )
+        {
+            wxVariant value = getFootprintFieldValue( static_cast<FOOTPRINT*>( item ), fieldName );
 
             if( value.IsNull() )
             {
@@ -509,15 +737,27 @@ bool DIALOG_FIND_BY_PROPERTIES::itemMatchesPropertyCriteria( BOARD_ITEM* aItem )
         if( row.isMixed )
             continue;
 
-        PROPERTY_BASE* prop = propMgr.GetProperty( TYPE_HASH( *aItem ), row.propertyName );
+        wxVariant itemValue;
 
-        if( !prop )
-            return false;
+        if( row.property == nullptr )
+        {
+            if( aItem->Type() != PCB_FOOTPRINT_T )
+                return false;
 
-        if( !propMgr.IsAvailableFor( TYPE_HASH( *aItem ), prop, aItem ) )
-            return false;
+            itemValue = getFootprintFieldValue( static_cast<FOOTPRINT*>( aItem ), row.propertyName );
+        }
+        else
+        {
+            PROPERTY_BASE* prop = propMgr.GetProperty( TYPE_HASH( *aItem ), row.propertyName );
 
-        wxVariant itemValue = getVariantAwareValue( aItem, prop );
+            if( !prop )
+                return false;
+
+            if( !propMgr.IsAvailableFor( TYPE_HASH( *aItem ), prop, aItem ) )
+                return false;
+
+            itemValue = getVariantAwareValue( aItem, prop );
+        }
 
         if( itemValue.IsNull() )
             return false;
@@ -574,6 +814,8 @@ void DIALOG_FIND_BY_PROPERTIES::selectMatchingFromQuery()
     if( expression.IsEmpty() )
         return;
 
+    wxString normalizedExpression = normalizeQueryFieldAliases( expression, m_propertyRows );
+
     PCBEXPR_COMPILER compiler( new PCBEXPR_UNIT_RESOLVER() );
     PCBEXPR_UCODE    ucode;
     PCBEXPR_CONTEXT  preflightContext( 0, F_Cu );
@@ -586,7 +828,7 @@ void DIALOG_FIND_BY_PROPERTIES::selectMatchingFromQuery()
                 errors += aMessage + wxT( "\n" );
             } );
 
-    bool ok = compiler.Compile( expression.ToUTF8().data(), &ucode, &preflightContext );
+    bool ok = compiler.Compile( normalizedExpression.ToUTF8().data(), &ucode, &preflightContext );
 
     if( !ok )
     {
@@ -663,11 +905,22 @@ wxString DIALOG_FIND_BY_PROPERTIES::generateExpressionFromProperties()
         if( row.isMixed )
             continue;
 
-        wxString field = propNameToExprField( row.propertyName );
+        wxString lhs;
+
+        if( row.property == nullptr )
+        {
+            lhs = wxString::Format( wxT( "A.getField(%s)" ),
+                                    formatValueForExpression( nullptr, wxVariant( row.propertyName ) ) );
+        }
+        else
+        {
+            lhs = wxString::Format( wxT( "A.%s" ), propNameToExprField( row.propertyName ) );
+        }
+
         wxString value = formatValueForExpression( row.property, row.rawValue );
         wxString op = ( row.matchMode == PROPERTY_MATCH_MODE::MATCHING ) ? wxT( "==" ) : wxT( "!=" );
 
-        conditions.Add( wxString::Format( wxT( "A.%s %s %s" ), field, op, value ) );
+        conditions.Add( wxString::Format( wxT( "%s %s %s" ), lhs, op, value ) );
     }
 
     wxString result;
@@ -706,6 +959,8 @@ void DIALOG_FIND_BY_PROPERTIES::onCheckSyntaxClick( wxCommandEvent& event )
         return;
     }
 
+    wxString normalizedExpression = normalizeQueryFieldAliases( expression, m_propertyRows );
+
     PCBEXPR_COMPILER compiler( new PCBEXPR_UNIT_RESOLVER() );
     PCBEXPR_UCODE    ucode;
     PCBEXPR_CONTEXT  preflightContext( 0, F_Cu );
@@ -717,7 +972,7 @@ void DIALOG_FIND_BY_PROPERTIES::onCheckSyntaxClick( wxCommandEvent& event )
                 errors += aMessage + wxT( "\n" );
             } );
 
-    bool ok = compiler.Compile( expression.ToUTF8().data(), &ucode, &preflightContext );
+    bool ok = compiler.Compile( normalizedExpression.ToUTF8().data(), &ucode, &preflightContext );
 
     if( ok )
         m_queryStatusLabel->SetLabel( _( "Syntax OK" ) );
@@ -814,6 +1069,15 @@ void DIALOG_FIND_BY_PROPERTIES::onScintillaCharAdded( wxStyledTextEvent& aEvent 
                 if( seen.insert( name ).second )
                     tokens.Add( name );
             }
+        }
+
+        for( const wxString& fieldName : getQueryableFootprintFieldNames( m_propertyRows ) )
+        {
+            wxString exprName = fieldName;
+            exprName.Replace( wxT( " " ), wxT( "_" ) );
+
+            if( seen.insert( exprName ).second )
+                tokens.Add( exprName );
         }
 
         tokens.Sort();
