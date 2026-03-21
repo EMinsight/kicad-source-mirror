@@ -162,6 +162,7 @@ void SCH_PLOTTER::createPDFFile( const SCH_PLOT_OPTS& aPlotOpts,
                 plotFileName = getOutputFilenameSingle( aPlotOpts, aReporter, ext );
 
                 m_lastOutputFilePath = plotFileName.GetFullPath();
+                m_outputFilePaths.push_back( m_lastOutputFilePath );
 
                 if( !plotFileName.IsOk() )
                     return;
@@ -385,6 +386,7 @@ void SCH_PLOTTER::createPSFiles( const SCH_PLOT_OPTS& aPlotOpts,
             wxFileName plotFileName = createPlotFileName( aPlotOpts, fname, ext, aReporter );
 
             m_lastOutputFilePath = plotFileName.GetFullPath();
+            m_outputFilePaths.push_back( m_lastOutputFilePath );
 
             if( !plotFileName.IsOk() )
             {
@@ -539,6 +541,7 @@ void SCH_PLOTTER::createSVGFiles( const SCH_PLOT_OPTS& aPlotOpts,
             wxFileName plotFileName = createPlotFileName( aPlotOpts, fname, ext, aReporter );
 
             m_lastOutputFilePath = plotFileName.GetFullPath();
+            m_outputFilePaths.push_back( m_lastOutputFilePath );
 
             if( !plotFileName.IsOk() )
                 return;
@@ -721,6 +724,7 @@ void SCH_PLOTTER::createDXFFiles( const SCH_PLOT_OPTS& aPlotOpts,
             wxFileName plotFileName = createPlotFileName( aPlotOpts, fname, ext, aReporter );
 
             m_lastOutputFilePath = plotFileName.GetFullPath();
+            m_outputFilePaths.push_back( m_lastOutputFilePath );
 
             if( !plotFileName.IsOk() )
                 return;
@@ -880,6 +884,8 @@ wxFileName SCH_PLOTTER::createPlotFileName( const SCH_PLOT_OPTS& aPlotOpts,
 void SCH_PLOTTER::Plot( PLOT_FORMAT aPlotFormat, const SCH_PLOT_OPTS& aPlotOpts,
                         SCH_RENDER_SETTINGS* aRenderSettings, REPORTER* aReporter )
 {
+    m_outputFilePaths.clear();
+
     wxString oldVariant = m_schematic->GetCurrentVariant();
     m_schematic->SetCurrentVariant( aPlotOpts.m_variant );
     m_colorSettings = ::GetColorSettings( aPlotOpts.m_theme );
