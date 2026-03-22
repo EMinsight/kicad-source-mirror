@@ -332,10 +332,10 @@ COLOR4D PCB_RENDER_SETTINGS::GetColor( const BOARD_ITEM* aItem, int aLayer ) con
     {
         if( aItem->Type() == PCB_MARKER_T )
         {
-            auto it = m_layerColors.find( LAYER_DRC_HIGHLIGHTED );
+            auto itemLayerIter = m_layerColors.find( LAYER_DRC_HIGHLIGHTED );
 
-            if( it != m_layerColors.end() )
-                return it->second;
+            if( itemLayerIter != m_layerColors.end() )
+                return itemLayerIter->second;
         }
 
         return color.Brightened( m_selectFactor ).WithAlpha( 0.8 );
