@@ -57,7 +57,6 @@ class NOTIFICATIONS_MANAGER;
 class COMMON_SETTINGS;
 class SETTINGS_MANAGER;
 class LIBRARY_MANAGER;
-class SCRIPTING;
 
 #ifdef KICAD_IPC_API
 class API_PLUGIN_MANAGER;
@@ -299,11 +298,10 @@ public:
      * @note Do not initialize anything relating to DSOs or projects.
      *
      * @param aHeadless If true, run in headless mode (e.g. for unit tests)
-     * @param aSkipPyInit If true, do not init python stuff.
      * Useful in application that do not use python, to disable python dependency at run time
      * @return true if success, false if failure and program is to terminate.
      */
-    bool InitPgm( bool aHeadless = false, bool aSkipPyInit = false, bool aIsUnitTest = false );
+    bool InitPgm( bool aHeadless = false, bool aIsUnitTest = false );
 
     // The PGM_* classes can have difficulties at termination if they
     // are not destroyed soon enough.  Relying on a static destructor can be
@@ -414,8 +412,6 @@ protected:
     std::unique_ptr<LIBRARY_MANAGER> m_library_manager;
     std::unique_ptr<BACKGROUND_JOBS_MONITOR> m_background_jobs_monitor;
     std::unique_ptr<NOTIFICATIONS_MANAGER> m_notifications_manager;
-
-    std::unique_ptr<SCRIPTING> m_python_scripting;
 
     /// Check if there is another copy of Kicad running at the same time.
     std::unique_ptr<wxSingleInstanceChecker> m_pgm_checker;

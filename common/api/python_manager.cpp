@@ -28,7 +28,7 @@
 #include <api/api_utils.h>
 #include <paths.h>
 #include <pgm_base.h>
-#include <python_manager.h>
+#include <api/python_manager.h>
 #include <thread_pool.h>
 #include <wx_filename.h>
 

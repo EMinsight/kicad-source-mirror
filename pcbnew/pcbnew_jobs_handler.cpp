@@ -114,7 +114,6 @@
 #include <paths.h>
 #include <tools/zone_filler_tool.h>
 
-#include "pcbnew_scripting_helpers.h"
 #include <locale_io.h>
 #include <confirm.h>
 
@@ -2294,8 +2293,7 @@ int PCBNEW_JOBS_HANDLER::doFpExportSvg( JOB_FP_EXPORT_SVG* aSvgJob, const FOOTPR
 {
     // the hack for now is we create fake boards containing the footprint and plot the board
     // until we refactor better plot api later
-    std::unique_ptr<BOARD> brd;
-    brd.reset( CreateEmptyBoard() );
+    std::unique_ptr<BOARD> brd = BOARD_LOADER::CreateEmptyBoard( Pgm().GetSettingsManager().GetProject( "" ) );
     brd->GetProject()->ApplyTextVars( aSvgJob->GetVarOverrides() );
     brd->SynchronizeProperties();
 
@@ -2566,7 +2564,7 @@ int PCBNEW_JOBS_HANDLER::JobExportDrc( JOB* aJob )
 
     if( drcJob->m_refillZones && drcJob->m_saveBoard )
     {
-        if( SaveBoard( drcJob->m_filename, brd, true ) )
+        if( BOARD_LOADER::SaveBoard( drcJob->m_filename, brd ) )
         {
             m_reporter->Report( _( "Saved board\n" ), RPT_SEVERITY_ACTION );
         }

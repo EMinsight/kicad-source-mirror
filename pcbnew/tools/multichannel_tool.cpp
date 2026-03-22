@@ -45,7 +45,6 @@
 #include <connectivity/connectivity_data.h>
 #include <connectivity/topo_match.h>
 #include <algorithm>
-#include <pcbnew_scripting_helpers.h>
 #include <pcb_track.h>
 #include <tool/tool_manager.h>
 #include <tools/pcb_picker_tool.h>

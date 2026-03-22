@@ -304,8 +304,6 @@ set( KICOMMON_SRCS
     singleton.cpp
     pgm_base.cpp
 
-    ../scripting/python_scripting.cpp
-
     io/kicad/kicad_io_utils.cpp    # needed by richio
     io/io_base.cpp
     io/io_utils.cpp
@@ -332,8 +330,7 @@ if( KICAD_IPC_API )
         api/api_plugin.cpp
         api/api_plugin_manager.cpp
         api/api_server.cpp
-
-        ../scripting/python_manager.cpp
+        api/python_manager.cpp
     )
 endif()
 
@@ -386,9 +383,6 @@ target_link_libraries( kicommon
    	${FREETYPE_LIBRARIES}
    	${HarfBuzz_LIBRARIES}
 	${Fontconfig_LIBRARIES}
-
-    # needed because of python_scripting.cpp
-    ${PYTHON_LIBRARIES}
     )
 
 
@@ -894,9 +888,7 @@ target_link_libraries( common
     nanosvg
     dxflib_qcad
     tinyspline_lib
-    scripting
     nlohmann_json
-    pybind11::embed
     compoundfilereader
     Boost::headers
     # Database support needs these two

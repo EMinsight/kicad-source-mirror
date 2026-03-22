@@ -23,7 +23,6 @@
  * 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA
  */
 
-#include <pcbnew_scripting_helpers.h>
 #include <pgm_base.h>
 #include <eda_pattern_match.h>
 #include <background_jobs_monitor.h>
@@ -67,7 +66,6 @@
 #include <panel_3D_opengl_options.h>
 #include <panel_3D_raytracing_options.h>
 #include <project_pcb.h>
-#include <python_scripting.h>
 #include <string_utils.h>
 #include <thread_pool.h>
 #include <trace_helpers.h>
@@ -94,10 +92,6 @@
 #include <board.h>
 #include <board_loader.h>
 #endif
-
-/* init functions defined by swig */
-
-extern "C" PyObject* PyInit__pcbnew( void );
 
 
 /**
@@ -262,9 +256,6 @@ static struct IFACE : public KIFACE_BASE, public UNITS_PROVIDER
         case FRAME_PCB_EDITOR:
         {
             auto frame = new PCB_EDIT_FRAME( aKiway, aParent );
-
-            // give the scripting helpers access to our frame
-            ScriptingSetPcbEditFrame( frame );
 
             if( Kiface().IsSingle() )
             {
@@ -553,9 +544,6 @@ static struct IFACE : public KIFACE_BASE, public UNITS_PROVIDER
             // Signature: wxString (*)(const wxString& aFilterJson)
             return reinterpret_cast<void*>( &filterFootprints );
         }
-
-        case KIFACE_SCRIPTING_LEGACY:
-            return reinterpret_cast<void*>( PyInit__pcbnew );
 
         default:
             return nullptr;

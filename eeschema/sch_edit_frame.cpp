@@ -58,7 +58,6 @@
 #include <core/profile.h>
 #include <project/project_file.h>
 #include <project/net_settings.h>
-#include <python_scripting.h>
 #include <sch_edit_frame.h>
 #include <symbol_chooser_frame.h>
 #include <sch_painter.h>

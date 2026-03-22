@@ -66,8 +66,6 @@ struct PLUGIN_RUNTIME
 
 /**
  * An action performed by a plugin via the IPC API
- * (not to be confused with ACTION_PLUGIN, the old SWIG plugin system, which will be removed
- * in the future)
  */
 struct PLUGIN_ACTION
 {

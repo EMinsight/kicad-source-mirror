@@ -65,7 +65,6 @@
 #include <tools/pcb_actions.h>
 #include <tools/footprint_wizard_tools.h>
 #include <toolbars_footprint_wizard.h>
-#include <python/scripting/pcb_scripting_tool.h>
 
 
 BEGIN_EVENT_TABLE( FOOTPRINT_WIZARD_FRAME, PCB_BASE_EDIT_FRAME )
@@ -149,7 +148,6 @@ FOOTPRINT_WIZARD_FRAME::FOOTPRINT_WIZARD_FRAME( KIWAY* aKiway, wxWindow* aParent
 
     m_toolManager->RegisterTool( new PCB_CONTROL );
     m_toolManager->RegisterTool( new PCB_SELECTION_TOOL );  // for std context menus (zoom & grid)
-    m_toolManager->RegisterTool( new SCRIPTING_TOOL );
     m_toolManager->RegisterTool( new COMMON_TOOLS );
     m_toolManager->RegisterTool( new COMMON_CONTROL );
     m_toolManager->RegisterTool( new FOOTPRINT_WIZARD_TOOLS );

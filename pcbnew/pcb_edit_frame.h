@@ -27,7 +27,6 @@
 #include <settings/app_settings.h>
 #include <variant>
 
-class ACTION_PLUGIN;
 class PCB_SCREEN;
 class BOARD;
 class BOARD_COMMIT;
@@ -101,16 +100,6 @@ public:
      * @return true if the any changes have not been saved
      */
     bool IsContentModified() const override;
-
-    /**
-     * Synchronize the environment variables from KiCad's environment into the Python interpreter.
-     */
-    void PythonSyncEnvironmentVariables();
-
-    /**
-     * Synchronize the project name from KiCad's environment into the Python interpreter.
-     */
-    void PythonSyncProjectName();
 
     /**
      * Update the layer manager and other widgets from the board setup
@@ -216,13 +205,13 @@ public:
      * Return true if button visibility action plugin setting was set to true
      * or it is unset and plugin defaults to true.
      */
-    static bool GetActionPluginButtonVisible( const wxString& aPluginPath, bool aPluginDefault );
+    static bool GetPluginActionButtonVisible( const wxString& aPluginPath, bool aPluginDefault );
 
     /**
      * Return ordered list of plugins in sequence in which they should appear on toolbar or
-     * in settings.  Handles both legacy (SWIG) and API plugins, so returns a heterogenous list.
+     * in settings.
      */
-    static std::vector<std::variant<ACTION_PLUGIN*, const PLUGIN_ACTION*>> GetOrderedActionPlugins();
+    static std::vector<const PLUGIN_ACTION*> GetOrderedPluginActions();
 
     void SaveProjectLocalSettings() override;
 
@@ -761,37 +750,6 @@ protected:
      * It also reinit the layers manager that slightly changes with canvases
      */
     void SwitchCanvas( EDA_DRAW_PANEL_GAL::GAL_TYPE aCanvasType ) override;
-
-    /**
-     * Fill action menu with all registered action plugins
-     */
-    void buildActionPluginMenus( ACTION_MENU* aActionMenu );
-
-    /**
-     * Append action plugin buttons to given toolbar
-     */
-    void addActionPluginTools( ACTION_TOOLBAR* aToolbar );
-
-    /**
-     * Execute action plugin's Run() method and updates undo buffer.
-     *
-     * @param aActionPlugin action plugin
-     */
-    void RunActionPlugin( ACTION_PLUGIN* aActionPlugin );
-
-    /**
-     * Launched by the menu when an action is called.
-     *
-     * @param aEvent sent by wx
-     */
-    void OnActionPluginMenu( wxCommandEvent& aEvent);
-
-    /**
-     * Launched by the button when an action is called.
-     *
-     * @param aEvent sent by wx
-     */
-    void OnActionPluginButton( wxCommandEvent& aEvent );
 
     PLUGIN_ACTION_SCOPE PluginActionScope() const override { return PLUGIN_ACTION_SCOPE::PCB; }
 

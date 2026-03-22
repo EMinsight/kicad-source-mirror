@@ -178,13 +178,7 @@ bool PGM_KICAD::OnPgmInit()
     }
 #endif
 
-    bool skipPythonInit = false;
-
-    if( appType == FRAME_BM2CMP || appType == FRAME_PL_EDITOR || appType == FRAME_GERBER
-        || appType == FRAME_CALC )
-        skipPythonInit = true;
-
-    if( !InitPgm( false, skipPythonInit ) )
+    if( !InitPgm( false ) )
         return false;
 
 

@@ -33,7 +33,7 @@
 #include <gestfich.h>
 #include <paths.h>
 #include <pgm_base.h>
-#include <python_manager.h>
+#include <api/python_manager.h>
 #include <settings/settings_manager.h>
 #include <settings/common_settings.h>
 

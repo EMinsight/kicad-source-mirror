@@ -148,3 +148,35 @@ void BOARD_LOADER::initializeLoadedBoard( BOARD* aBoard, const wxString& aFileNa
     aBoard->SynchronizeNetsAndNetClasses( true );
     aBoard->UpdateUserUnits( aBoard, nullptr );
 }
+
+
+std::unique_ptr<BOARD> BOARD_LOADER::CreateEmptyBoard( PROJECT* aProject )
+{
+    std::unique_ptr<BOARD> brd = std::make_unique<BOARD>();
+    brd->SetProject( aProject );
+    return brd;
+}
+
+
+bool BOARD_LOADER::SaveBoard( wxString& aFileName, BOARD* aBoard, PCB_IO_MGR::PCB_FILE_T aFormat )
+{
+    aBoard->BuildConnectivity();
+    aBoard->SynchronizeNetsAndNetClasses( false );
+
+    try
+    {
+        PCB_IO_MGR::Save( aFormat, aFileName, aBoard, nullptr );
+    }
+    catch( ... )
+    {
+        return false;
+    }
+
+    return true;
+}
+
+
+bool BOARD_LOADER::SaveBoard( wxString& aFileName, BOARD* aBoard )
+{
+    return SaveBoard( aFileName, aBoard, PCB_IO_MGR::KICAD_SEXP );
+}

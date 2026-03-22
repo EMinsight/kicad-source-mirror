@@ -328,7 +328,6 @@ public:
         FACE_PL_EDITOR,
         FACE_PCB_CALCULATOR,
         FACE_BMP2CMP,
-        FACE_PYTHON,
 
         KIWAY_FACE_COUNT
     };
@@ -538,11 +537,7 @@ private:
 };
 
 
-#ifndef SWIG
-// provided by single_top.cpp and kicad.cpp;
 extern KIWAY Kiway;
-// whereas python launchers: single_top.py and project manager instantiate as a python object
-#endif
 
 
 /**

@@ -54,7 +54,6 @@
 
 // Needed to handle adding the plugins to the toolbar
 // TODO (ISM): This should be better abstracted away from the toolbars
-#include <python_scripting.h>
 #include <api/api_plugin_manager.h>
 
 

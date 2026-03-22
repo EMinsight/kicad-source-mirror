@@ -25,6 +25,7 @@
 #include <magic_enum.hpp>
 #include <thread_pool.h>
 #include <ranges>
+#include <set>
 #include <unordered_set>
 
 #include <paths.h>

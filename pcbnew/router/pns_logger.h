@@ -26,6 +26,7 @@
 #include <vector>
 #include <string>
 #include <sstream>
+#include <set>
 
 #include <math/vector2d.h>
 #include <kiid.h>

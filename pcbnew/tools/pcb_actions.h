@@ -467,7 +467,6 @@ public:
 
     static TOOL_ACTION showLayersManager;
     static TOOL_ACTION showNetInspector;
-    static TOOL_ACTION showPythonConsole;
     static TOOL_ACTION zonesManager;
 
     // Design Block management

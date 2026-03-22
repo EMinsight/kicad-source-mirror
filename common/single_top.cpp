@@ -355,16 +355,7 @@ bool PGM_SINGLE_TOP::OnPgmInit()
         return false;
     }
 
-    // Not all KiCad applications use the python stuff. skip python init
-    // for these apps.
-    bool skip_python_initialization = false;
-
-#if defined( BITMAP_2_CMP ) || defined( PL_EDITOR ) || defined( GERBVIEW ) || \
-    defined( PCB_CALCULATOR_BUILD )
-    skip_python_initialization = true;
-#endif
-
-    if( !InitPgm( false, skip_python_initialization ) )
+    if( !InitPgm( false ) )
     {
         // Clean up
         OnPgmExit();

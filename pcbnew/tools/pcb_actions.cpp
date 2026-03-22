@@ -1611,14 +1611,6 @@ TOOL_ACTION PCB_ACTIONS::updateLocalRatsnest( TOOL_ACTION_ARGS()
         .Scope( AS_GLOBAL )
         .Parameter( VECTOR2I() ) );
 
-TOOL_ACTION PCB_ACTIONS::showPythonConsole( TOOL_ACTION_ARGS()
-        .Name( "pcbnew.Control.showPythonConsole" )
-        .Scope( AS_GLOBAL )
-        .FriendlyName( _( "Scripting Console" ) )
-        .Tooltip( _( "Show the Python scripting console" ) )
-        .Icon( BITMAPS::py_script )
-        .ToolbarState( TOOLBAR_STATE::TOGGLE) );
-
 TOOL_ACTION PCB_ACTIONS::showLayersManager( TOOL_ACTION_ARGS()
         .Name( "pcbnew.Control.showLayersManager" )
         .Scope( AS_GLOBAL )

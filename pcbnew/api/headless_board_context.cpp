@@ -20,8 +20,9 @@
 
 #include <api/headless_board_context.h>
 #include <board.h>
-#include <pcbnew_scripting_helpers.h>
+#include <board_loader.h>
 #include <project.h>
+#include <settings/settings_manager.h>
 #include <tool/tool_manager.h>
 #include <wx/debug.h>
 
@@ -84,7 +85,18 @@ bool HEADLESS_BOARD_CONTEXT::SaveBoard()
     if( fileName.IsEmpty() )
         return false;
 
-    return ::SaveBoard( fileName, m_board.get(), false );
+    bool success = BOARD_LOADER::SaveBoard( fileName, m_board.get() );
+
+    if( success )
+    {
+        wxFileName pro = fileName;
+        pro.SetExt( FILEEXT::ProjectFileExtension );
+        pro.MakeAbsolute();
+
+        Pgm().GetSettingsManager().SaveProjectAs( pro.GetFullPath(), m_board->GetProject() );
+    }
+
+    return success;
 }
 
 
@@ -94,7 +106,17 @@ bool HEADLESS_BOARD_CONTEXT::SavePcbCopy( const wxString& aFileName, bool aCreat
         return false;
 
     wxString outPath = aFileName;
-    bool skipSettings = !aCreateProject;
 
-    return ::SaveBoard( outPath, m_board.get(), skipSettings );
+    bool success = BOARD_LOADER::SaveBoard( outPath, m_board.get() );
+
+    if( success && aCreateProject )
+    {
+        wxFileName pro = aFileName;
+        pro.SetExt( FILEEXT::ProjectFileExtension );
+        pro.MakeAbsolute();
+
+        Pgm().GetSettingsManager().SaveProjectAs( pro.GetFullPath(), m_board->GetProject() );
+    }
+
+    return success;
 }

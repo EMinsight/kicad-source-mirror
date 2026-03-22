@@ -75,9 +75,6 @@
 #include <pcb_draw_panel_gal.h>
 #include <drawing_sheet/ds_proxy_view_item.h>
 
-#include "../scripting/python_scripting.h"
-
-
 /* Data to build the layer pair indicator button */
 static wxBitmapBundle LayerPairBitmap;
 
@@ -456,9 +453,6 @@ void PCB_EDIT_FRAME::configureToolbars()
     auto pluginControlFactory =
             [this]( ACTION_TOOLBAR* aToolbar )
             {
-                // Add scripting console and API plugins
-                bool scriptingAvailable = SCRIPTING::IsWxAvailable();
-
 #ifdef KICAD_IPC_API
                 bool haveApiPlugins = Pgm().GetCommonSettings()->m_Api.enable_server
                                         && !Pgm().GetPluginManager().GetActionsForScope( PluginActionScope() ).empty();
@@ -466,18 +460,10 @@ void PCB_EDIT_FRAME::configureToolbars()
                 bool haveApiPlugins = false;
 #endif
 
-                if( scriptingAvailable || haveApiPlugins )
+                if( haveApiPlugins )
                 {
                     aToolbar->AddScaledSeparator( aToolbar->GetParent() );
-
-                    if( scriptingAvailable )
-                    {
-                        aToolbar->Add( PCB_ACTIONS::showPythonConsole );
-                        addActionPluginTools( aToolbar );
-                    }
-
-                    if( haveApiPlugins )
-                        AddApiPluginTools( aToolbar );
+                    AddApiPluginTools( aToolbar );
                 }
             };
 

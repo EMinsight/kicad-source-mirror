@@ -419,7 +419,7 @@ bool PGM_KICAD::OnPgmInit()
     }
 #endif
 
-    if( !InitPgm( true, true) )
+    if( !InitPgm( true ) )
         return false;
 
     m_bm.InitSettings( new KICAD_SETTINGS );

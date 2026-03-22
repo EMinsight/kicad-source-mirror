@@ -3313,13 +3313,6 @@ int SCH_EDITOR_CONTROL::ToggleAnnotateAuto( const TOOL_EVENT& aEvent )
 }
 
 
-int SCH_EDITOR_CONTROL::TogglePythonConsole( const TOOL_EVENT& aEvent )
-{
-    m_frame->ScriptingConsoleEnableDisable();
-    return 0;
-}
-
-
 int SCH_EDITOR_CONTROL::ReloadPlugins( const TOOL_EVENT& aEvent )
 {
 #ifdef KICAD_IPC_API

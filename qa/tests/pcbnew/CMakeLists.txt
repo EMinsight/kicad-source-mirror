@@ -196,7 +196,6 @@ target_link_libraries( qa_pcbnew
     gal
     common
     gal
-    scripting
     qa_utils
     dxflib_qcad
     tinyspline_lib
@@ -206,7 +205,6 @@ target_link_libraries( qa_pcbnew
     ${PCBNEW_IO_LIBRARIES}
     ${wxWidgets_LIBRARIES}
     ${GDI_PLUS_LIBRARIES}
-    ${PYTHON_LIBRARIES}
     Boost::headers
     Boost::unit_test_framework
     ${PCBNEW_EXTRA_LIBS}    # -lrt must follow Boost

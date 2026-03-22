@@ -649,7 +649,6 @@ target_link_libraries( eeschema_kiface
         pads_common
         pcm
         markdown_lib
-        scripting
         core
         Boost::headers
         ${wxWidgets_LIBRARIES}
