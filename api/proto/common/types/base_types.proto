@@ -508,3 +508,10 @@ enum RuleSeverity
   RS_DEBUG = 7;
   RS_UNDEFINED = 8;
 }
+
+message MinOptMax
+{
+  optional int32 min = 1;
+  optional int32 opt = 2;
+  optional int32 max = 3;
+}

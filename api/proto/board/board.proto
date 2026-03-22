@@ -264,10 +264,97 @@ enum CustomRuleLayerMode
   CRLM_INNER = 2;
 }
 
+enum CustomRuleConstraintType
+{
+  CRCT_UNKNOWN = 0;
+  CRCT_CLEARANCE = 1;
+  CRCT_CREEPAGE = 2;
+  CRCT_HOLE_CLEARANCE = 3;
+  CRCT_HOLE_TO_HOLE = 4;
+  CRCT_EDGE_CLEARANCE = 5;
+  CRCT_HOLE_SIZE = 6;
+  CRCT_COURTYARD_CLEARANCE = 7;
+  CRCT_SILK_CLEARANCE = 8;
+  CRCT_TEXT_HEIGHT = 9;
+  CRCT_TEXT_THICKNESS = 10;
+  CRCT_TRACK_WIDTH = 11;
+  CRCT_TRACK_SEGMENT_LENGTH = 12;
+  CRCT_ANNULAR_WIDTH = 13;
+  CRCT_ZONE_CONNECTION = 14;
+  CRCT_THERMAL_RELIEF_GAP = 15;
+  CRCT_THERMAL_SPOKE_WIDTH = 16;
+  CRCT_MIN_RESOLVED_SPOKES = 17;
+  CRCT_SOLDER_MASK_EXPANSION = 18;
+  CRCT_SOLDER_PASTE_ABS_MARGIN = 19;
+  CRCT_SOLDER_PASTE_REL_MARGIN = 20;
+  CRCT_DISALLOW = 21;
+  CRCT_VIA_DIAMETER = 22;
+  CRCT_LENGTH = 23;
+  CRCT_SKEW = 24;
+  CRCT_DIFF_PAIR_GAP = 25;
+  CRCT_MAX_UNCOUPLED = 26;
+  CRCT_DIFF_PAIR_INTRA_SKEW = 27;
+  CRCT_VIA_COUNT = 28;
+  CRCT_PHYSICAL_CLEARANCE = 29;
+  CRCT_PHYSICAL_HOLE_CLEARANCE = 30;
+  CRCT_ASSERTION = 31;
+  CRCT_CONNECTION_WIDTH = 32;
+  CRCT_TRACK_ANGLE = 33;
+  CRCT_VIA_DANGLING = 34;
+  CRCT_BRIDGED_MASK = 35;
+  CRCT_SOLDER_MASK_SLIVER = 36;
+}
+
+enum CustomRuleConstraintOption
+{
+  CRCO_UNKNOWN = 0;
+  CRCO_SKEW_WITHIN_DIFF_PAIRS = 1;
+  CRCO_SPACE_DOMAIN = 2;
+  CRCO_TIME_DOMAIN = 3;
+}
+
+enum CustomRuleDisallowType
+{
+  CRDT_UNKNOWN = 0;
+  CRDT_THROUGH_VIAS = 1;
+  CRDT_MICRO_VIAS = 2;
+  CRDT_BLIND_VIAS = 3;
+  CRDT_BURIED_VIAS = 4;
+  CRDT_TRACKS = 5;
+  CRDT_PADS = 6;
+  CRDT_ZONES = 7;
+  CRDT_TEXTS = 8;
+  CRDT_GRAPHICS = 9;
+  CRDT_HOLES = 10;
+  CRDT_FOOTPRINTS = 11;
+}
+
+message CustomRuleDisallowSettings
+{
+  repeated CustomRuleDisallowType types = 1;
+}
+
+message CustomRuleConstraint
+{
+  CustomRuleConstraintType type = 1;
+  optional string name = 2;
+
+  oneof value {
+    // nanometers, picoseconds, or unitless depending on constraint type
+    kiapi.common.types.MinOptMax numeric = 3;
+    CustomRuleDisallowSettings disallow = 4;
+    kiapi.board.types.ZoneConnectionStyle zone_connection = 5;
+    string assertion_expression = 6;
+  }
+
+  // grab bag of stuff; may be refactored to more specific messages later
+  repeated CustomRuleConstraintOption options = 100;
+}
+
 message CustomRule
 {
   string condition = 1;
-  string constraints = 2;
+  repeated CustomRuleConstraint constraints = 2;
 
   oneof layer_condition {
     kiapi.board.types.BoardLayer single_layer = 3;
@@ -275,6 +362,9 @@ message CustomRule
   }
 
   kiapi.common.types.RuleSeverity severity = 5;
+
+  string name = 6;
+  optional string comments = 7;
 }
 
 message BoardDesignRules
@@ -286,5 +376,4 @@ message BoardDesignRules
   ViaProtectionDefaults via_protection = 5;
   repeated DrcSeveritySetting severities = 6;
   repeated DrcExclusion exclusions = 7;
-  repeated CustomRule custom_rules = 8;
 }

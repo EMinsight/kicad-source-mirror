@@ -67,8 +67,13 @@
 #include <zone.h>
 
 #include <api/common/types/base_types.pb.h>
+#include <drc/drc_rule_condition.h>
+#include <drc/drc_rule_parser.h>
 #include <widgets/appearance_controls.h>
 #include <widgets/report_severity.h>
+#include <drc/rule_editor/drc_re_rule_loader.h>
+#include <wx/ffile.h>
+#include <wx/filename.h>
 
 using namespace kiapi::common::commands;
 using types::CommandStatus;
@@ -112,8 +117,11 @@ API_HANDLER_PCB::API_HANDLER_PCB( std::shared_ptr<BOARD_CONTEXT> aContext,
         &API_HANDLER_PCB::handleSetBoardEnabledLayers );
     registerHandler<GetGraphicsDefaults, GraphicsDefaultsResponse>(
             &API_HANDLER_PCB::handleGetGraphicsDefaults );
-    registerHandler<GetBoundingBox, GetBoundingBoxResponse>(
-            &API_HANDLER_PCB::handleGetBoundingBox );
+    registerHandler<GetBoardDesignRules, BoardDesignRulesResponse>( &API_HANDLER_PCB::handleGetBoardDesignRules );
+    registerHandler<SetBoardDesignRules, BoardDesignRulesResponse>( &API_HANDLER_PCB::handleSetBoardDesignRules );
+    registerHandler<GetCustomDesignRules, CustomRulesResponse>( &API_HANDLER_PCB::handleGetCustomDesignRules );
+    registerHandler<SetCustomDesignRules, CustomRulesResponse>( &API_HANDLER_PCB::handleSetCustomDesignRules );
+    registerHandler<GetBoundingBox, GetBoundingBoxResponse>( &API_HANDLER_PCB::handleGetBoundingBox );
     registerHandler<GetPadShapeAsPolygon, PadShapeAsPolygonResponse>(
             &API_HANDLER_PCB::handleGetPadShapeAsPolygon );
     registerHandler<CheckPadstackPresenceOnLayers, PadstackPresenceResponse>(
@@ -1195,6 +1203,559 @@ HANDLER_RESULT<GraphicsDefaultsResponse> API_HANDLER_PCB::handleGetGraphicsDefau
     }
 
     return response;
+}
+
+
+HANDLER_RESULT<BoardDesignRulesResponse> API_HANDLER_PCB::handleGetBoardDesignRules(
+        const HANDLER_CONTEXT<GetBoardDesignRules>& aCtx )
+{
+    HANDLER_RESULT<bool> documentValidation = validateDocument( aCtx.Request.board() );
+
+    if( !documentValidation )
+        return tl::unexpected( documentValidation.error() );
+
+    const BOARD_DESIGN_SETTINGS& bds = board()->GetDesignSettings();
+    BoardDesignRulesResponse     response;
+    kiapi::board::BoardDesignRules* rules = response.mutable_rules();
+
+    kiapi::board::MinimumConstraints* constraints = rules->mutable_constraints();
+
+    constraints->mutable_min_clearance()->set_value_nm( bds.m_MinClearance );
+    constraints->mutable_min_groove_width()->set_value_nm( bds.m_MinGrooveWidth );
+    constraints->mutable_min_connection_width()->set_value_nm( bds.m_MinConn );
+    constraints->mutable_min_track_width()->set_value_nm( bds.m_TrackMinWidth );
+    constraints->mutable_min_via_annular_width()->set_value_nm( bds.m_ViasMinAnnularWidth );
+    constraints->mutable_min_via_size()->set_value_nm( bds.m_ViasMinSize );
+    constraints->mutable_min_through_drill()->set_value_nm( bds.m_MinThroughDrill );
+    constraints->mutable_min_microvia_size()->set_value_nm( bds.m_MicroViasMinSize );
+    constraints->mutable_min_microvia_drill()->set_value_nm( bds.m_MicroViasMinDrill );
+    constraints->mutable_copper_edge_clearance()->set_value_nm( bds.m_CopperEdgeClearance );
+    constraints->mutable_hole_clearance()->set_value_nm( bds.m_HoleClearance );
+    constraints->mutable_hole_to_hole_min()->set_value_nm( bds.m_HoleToHoleMin );
+    constraints->mutable_silk_clearance()->set_value_nm( bds.m_SilkClearance );
+    constraints->set_min_resolved_spokes( bds.m_MinResolvedSpokes );
+    constraints->mutable_min_silk_text_height()->set_value_nm( bds.m_MinSilkTextHeight );
+    constraints->mutable_min_silk_text_thickness()->set_value_nm( bds.m_MinSilkTextThickness );
+
+    kiapi::board::PredefinedSizes* sizes = rules->mutable_predefined_sizes();
+
+    for( size_t ii = 1; ii < bds.m_TrackWidthList.size(); ++ii )
+        sizes->add_tracks()->mutable_width()->set_value_nm( bds.m_TrackWidthList[ii] );
+
+    for( size_t ii = 1; ii < bds.m_ViasDimensionsList.size(); ++ii )
+    {
+        kiapi::board::PresetViaDimension* via = sizes->add_vias();
+        via->mutable_diameter()->set_value_nm( bds.m_ViasDimensionsList[ii].m_Diameter );
+        via->mutable_drill()->set_value_nm( bds.m_ViasDimensionsList[ii].m_Drill );
+    }
+
+    for( size_t ii = 1; ii < bds.m_DiffPairDimensionsList.size(); ++ii )
+    {
+        kiapi::board::PresetDiffPairDimension* pair = sizes->add_diff_pairs();
+        pair->mutable_width()->set_value_nm( bds.m_DiffPairDimensionsList[ii].m_Width );
+        pair->mutable_gap()->set_value_nm( bds.m_DiffPairDimensionsList[ii].m_Gap );
+        pair->mutable_via_gap()->set_value_nm( bds.m_DiffPairDimensionsList[ii].m_ViaGap );
+    }
+
+    kiapi::board::SolderMaskPasteDefaults* maskPaste = rules->mutable_solder_mask_paste();
+
+    maskPaste->mutable_mask_expansion()->set_value_nm( bds.m_SolderMaskExpansion );
+    maskPaste->mutable_mask_min_width()->set_value_nm( bds.m_SolderMaskMinWidth );
+    maskPaste->mutable_mask_to_copper_clearance()->set_value_nm( bds.m_SolderMaskToCopperClearance );
+    maskPaste->mutable_paste_margin()->set_value_nm( bds.m_SolderPasteMargin );
+    maskPaste->set_paste_margin_ratio( bds.m_SolderPasteMarginRatio );
+    maskPaste->set_allow_soldermask_bridges_in_footprints( bds.m_AllowSoldermaskBridgesInFPs );
+
+    kiapi::board::TeardropDefaults* teardrops = rules->mutable_teardrops();
+
+    teardrops->set_target_vias( bds.m_TeardropParamsList.m_TargetVias );
+    teardrops->set_target_pth_pads( bds.m_TeardropParamsList.m_TargetPTHPads );
+    teardrops->set_target_smd_pads( bds.m_TeardropParamsList.m_TargetSMDPads );
+    teardrops->set_target_track_to_track( bds.m_TeardropParamsList.m_TargetTrack2Track );
+    teardrops->set_use_round_shapes_only( bds.m_TeardropParamsList.m_UseRoundShapesOnly );
+
+    TEARDROP_PARAMETERS_LIST& tdList = const_cast<TEARDROP_PARAMETERS_LIST&>( bds.m_TeardropParamsList );
+
+    for( int target = TARGET_ROUND; target <= TARGET_TRACK; ++target )
+    {
+        const TEARDROP_PARAMETERS* params = tdList.GetParameters( static_cast<TARGET_TD>( target ) );
+        kiapi::board::TeardropTargetEntry* entry = teardrops->add_target_params();
+
+        entry->set_target( ToProtoEnum<TARGET_TD, kiapi::board::TeardropTarget>(
+            static_cast<TARGET_TD>( target ) ) );
+        entry->mutable_params()->set_enabled( params->m_Enabled );
+        entry->mutable_params()->mutable_max_length()->set_value_nm( params->m_TdMaxLen );
+        entry->mutable_params()->mutable_max_width()->set_value_nm( params->m_TdMaxWidth );
+        entry->mutable_params()->set_best_length_ratio( params->m_BestLengthRatio );
+        entry->mutable_params()->set_best_width_ratio( params->m_BestWidthRatio );
+        entry->mutable_params()->set_width_to_size_filter_ratio( params->m_WidthtoSizeFilterRatio );
+        entry->mutable_params()->set_curved_edges( params->m_CurvedEdges );
+        entry->mutable_params()->set_allow_two_tracks( params->m_AllowUseTwoTracks );
+        entry->mutable_params()->set_on_pads_in_zones( params->m_TdOnPadsInZones );
+    }
+
+    kiapi::board::ViaProtectionDefaults* viaProtection = rules->mutable_via_protection();
+
+    viaProtection->set_tent_front( bds.m_TentViasFront );
+    viaProtection->set_tent_back( bds.m_TentViasBack );
+    viaProtection->set_cover_front( bds.m_CoverViasFront );
+    viaProtection->set_cover_back( bds.m_CoverViasBack );
+    viaProtection->set_plug_front( bds.m_PlugViasFront );
+    viaProtection->set_plug_back( bds.m_PlugViasBack );
+    viaProtection->set_cap( bds.m_CapVias );
+    viaProtection->set_fill( bds.m_FillVias );
+
+    for( const auto& [errorCode, severity] : bds.m_DRCSeverities )
+    {
+        std::shared_ptr<DRC_ITEM> drcItem = DRC_ITEM::Create( errorCode );
+
+        if( !drcItem || drcItem->GetSettingsKey().IsEmpty() )
+            continue;
+
+        kiapi::board::DrcSeveritySetting* setting = rules->add_severities();
+        setting->set_error_key( drcItem->GetSettingsKey().ToStdString() );
+        setting->set_severity( ToProtoEnum<SEVERITY, kiapi::common::types::RuleSeverity>( severity ) );
+    }
+
+    for( const wxString& serialized : bds.m_DrcExclusions )
+    {
+        kiapi::board::DrcExclusion* exclusion = rules->add_exclusions();
+        exclusion->mutable_marker()->mutable_id()->set_opaque_id( serialized.ToStdString() );
+
+        auto it = bds.m_DrcExclusionComments.find( serialized );
+
+        if( it != bds.m_DrcExclusionComments.end() )
+            exclusion->set_comment( it->second.ToStdString() );
+    }
+
+    response.set_custom_rules_status( CRS_NONE );
+
+    wxFileName fn = context()->GetBoard()->GetFileName();
+    fn.SetExt( FILEEXT::DesignRulesFileExtension );
+    wxString rulesPath = context()->Prj().AbsolutePath( fn.GetFullName() );
+
+    if( !rulesPath.IsEmpty() && wxFileName::IsFileReadable( rulesPath ) )
+    {
+        wxFFile file( rulesPath, "r" );
+        wxString content;
+        std::vector<std::shared_ptr<DRC_RULE>> parsedRules;
+
+        if( !file.IsOpened() )
+        {
+            response.set_custom_rules_status( CRS_INVALID );
+            return response;
+        }
+
+        file.ReadAll( &content );
+        file.Close();
+
+        try
+        {
+            DRC_RULES_PARSER parser( content, "File" );
+            parser.Parse( parsedRules, nullptr );
+            response.set_custom_rules_status( CRS_VALID );
+        }
+        catch( const IO_ERROR& )
+        {
+            response.set_custom_rules_status( CRS_INVALID );
+        }
+    }
+
+    return response;
+}
+
+
+HANDLER_RESULT<BoardDesignRulesResponse> API_HANDLER_PCB::handleSetBoardDesignRules(
+        const HANDLER_CONTEXT<SetBoardDesignRules>& aCtx )
+{
+    HANDLER_RESULT<bool> documentValidation = validateDocument( aCtx.Request.board() );
+
+    if( !documentValidation )
+        return tl::unexpected( documentValidation.error() );
+
+    BOARD_DESIGN_SETTINGS newSettings( board()->GetDesignSettings() );
+    const kiapi::board::BoardDesignRules& rules = aCtx.Request.rules();
+
+    if( rules.has_constraints() )
+    {
+        const kiapi::board::MinimumConstraints& constraints = rules.constraints();
+
+        newSettings.m_MinClearance = constraints.min_clearance().value_nm();
+        newSettings.m_MinGrooveWidth = constraints.min_groove_width().value_nm();
+        newSettings.m_MinConn = constraints.min_connection_width().value_nm();
+        newSettings.m_TrackMinWidth = constraints.min_track_width().value_nm();
+        newSettings.m_ViasMinAnnularWidth = constraints.min_via_annular_width().value_nm();
+        newSettings.m_ViasMinSize = constraints.min_via_size().value_nm();
+        newSettings.m_MinThroughDrill = constraints.min_through_drill().value_nm();
+        newSettings.m_MicroViasMinSize = constraints.min_microvia_size().value_nm();
+        newSettings.m_MicroViasMinDrill = constraints.min_microvia_drill().value_nm();
+        newSettings.m_CopperEdgeClearance = constraints.copper_edge_clearance().value_nm();
+        newSettings.m_HoleClearance = constraints.hole_clearance().value_nm();
+        newSettings.m_HoleToHoleMin = constraints.hole_to_hole_min().value_nm();
+        newSettings.m_SilkClearance = constraints.silk_clearance().value_nm();
+        newSettings.m_MinResolvedSpokes = constraints.min_resolved_spokes();
+        newSettings.m_MinSilkTextHeight = constraints.min_silk_text_height().value_nm();
+        newSettings.m_MinSilkTextThickness = constraints.min_silk_text_thickness().value_nm();
+    }
+
+    if( rules.has_predefined_sizes() )
+    {
+        newSettings.m_TrackWidthList.clear();
+        newSettings.m_TrackWidthList.emplace_back( 0 );
+
+        for( const kiapi::board::PresetTrackWidth& track : rules.predefined_sizes().tracks() )
+            newSettings.m_TrackWidthList.emplace_back( track.width().value_nm() );
+
+        newSettings.m_ViasDimensionsList.clear();
+        newSettings.m_ViasDimensionsList.emplace_back( 0, 0 );
+
+        for( const kiapi::board::PresetViaDimension& via : rules.predefined_sizes().vias() )
+        {
+            newSettings.m_ViasDimensionsList.emplace_back( static_cast<int>( via.diameter().value_nm() ),
+                                                           static_cast<int>( via.drill().value_nm() ) );
+        }
+
+        newSettings.m_DiffPairDimensionsList.clear();
+        newSettings.m_DiffPairDimensionsList.emplace_back( 0, 0, 0 );
+
+        for( const kiapi::board::PresetDiffPairDimension& pair : rules.predefined_sizes().diff_pairs() )
+        {
+            newSettings.m_DiffPairDimensionsList.emplace_back(
+                    static_cast<int>( pair.width().value_nm() ),
+                    static_cast<int>( pair.gap().value_nm() ),
+                    static_cast<int>( pair.via_gap().value_nm() ) );
+        }
+    }
+
+    if( rules.has_solder_mask_paste() )
+    {
+        const kiapi::board::SolderMaskPasteDefaults& maskPaste = rules.solder_mask_paste();
+
+        newSettings.m_SolderMaskExpansion = maskPaste.mask_expansion().value_nm();
+        newSettings.m_SolderMaskMinWidth = maskPaste.mask_min_width().value_nm();
+        newSettings.m_SolderMaskToCopperClearance = maskPaste.mask_to_copper_clearance().value_nm();
+        newSettings.m_SolderPasteMargin = maskPaste.paste_margin().value_nm();
+        newSettings.m_SolderPasteMarginRatio = maskPaste.paste_margin_ratio();
+        newSettings.m_AllowSoldermaskBridgesInFPs =
+                maskPaste.allow_soldermask_bridges_in_footprints();
+    }
+
+    if( rules.has_teardrops() )
+    {
+        const kiapi::board::TeardropDefaults& teardrops = rules.teardrops();
+
+        newSettings.m_TeardropParamsList.m_TargetVias = teardrops.target_vias();
+        newSettings.m_TeardropParamsList.m_TargetPTHPads = teardrops.target_pth_pads();
+        newSettings.m_TeardropParamsList.m_TargetSMDPads = teardrops.target_smd_pads();
+        newSettings.m_TeardropParamsList.m_TargetTrack2Track = teardrops.target_track_to_track();
+        newSettings.m_TeardropParamsList.m_UseRoundShapesOnly = teardrops.use_round_shapes_only();
+
+        for( const kiapi::board::TeardropTargetEntry& entry : teardrops.target_params() )
+        {
+            if( entry.target() == kiapi::board::TeardropTarget::TDT_UNKNOWN )
+                continue;
+
+            TARGET_TD target = FromProtoEnum<TARGET_TD, kiapi::board::TeardropTarget>(
+                    entry.target() );
+
+            TEARDROP_PARAMETERS* params = newSettings.m_TeardropParamsList.GetParameters( target );
+
+            params->m_Enabled = entry.params().enabled();
+            params->m_TdMaxLen = entry.params().max_length().value_nm();
+            params->m_TdMaxWidth = entry.params().max_width().value_nm();
+            params->m_BestLengthRatio = entry.params().best_length_ratio();
+            params->m_BestWidthRatio = entry.params().best_width_ratio();
+            params->m_WidthtoSizeFilterRatio = entry.params().width_to_size_filter_ratio();
+            params->m_CurvedEdges = entry.params().curved_edges();
+            params->m_AllowUseTwoTracks = entry.params().allow_two_tracks();
+            params->m_TdOnPadsInZones = entry.params().on_pads_in_zones();
+        }
+    }
+
+    if( rules.has_via_protection() )
+    {
+        const kiapi::board::ViaProtectionDefaults& viaProtection = rules.via_protection();
+
+        newSettings.m_TentViasFront = viaProtection.tent_front();
+        newSettings.m_TentViasBack = viaProtection.tent_back();
+        newSettings.m_CoverViasFront = viaProtection.cover_front();
+        newSettings.m_CoverViasBack = viaProtection.cover_back();
+        newSettings.m_PlugViasFront = viaProtection.plug_front();
+        newSettings.m_PlugViasBack = viaProtection.plug_back();
+        newSettings.m_CapVias = viaProtection.cap();
+        newSettings.m_FillVias = viaProtection.fill();
+    }
+
+    if( rules.severities_size() > 0 )
+    {
+        newSettings.m_DRCSeverities.clear();
+
+        for( const kiapi::board::DrcSeveritySetting& severitySetting : rules.severities() )
+        {
+            std::shared_ptr<DRC_ITEM> drcItem = DRC_ITEM::Create( wxString::FromUTF8( severitySetting.error_key() ) );
+
+            if( !drcItem )
+            {
+                ApiResponseStatus e;
+                e.set_status( ApiStatusCode::AS_BAD_REQUEST );
+                e.set_error_message( fmt::format( "Unknown DRC error key '{}'", severitySetting.error_key() ) );
+                return tl::unexpected( e );
+            }
+
+            const std::unordered_set<SEVERITY> permitted( { RPT_SEVERITY_ERROR, RPT_SEVERITY_WARNING, RPT_SEVERITY_IGNORE } );
+            SEVERITY setting = FromProtoEnum<SEVERITY, kiapi::common::types::RuleSeverity>( severitySetting.severity() );
+
+            if( !permitted.contains( setting ) )
+            {
+                ApiResponseStatus e;
+                e.set_status( ApiStatusCode::AS_BAD_REQUEST );
+                e.set_error_message( fmt::format( "DRC severity must be error, warning, or ignore" ) );
+                return tl::unexpected( e );
+            }
+
+            newSettings.m_DRCSeverities[drcItem->GetErrorCode()] = setting;
+        }
+    }
+
+    if( rules.exclusions_size() > 0 )
+    {
+        newSettings.m_DrcExclusions.clear();
+        newSettings.m_DrcExclusionComments.clear();
+
+        for( const kiapi::board::DrcExclusion& exclusion : rules.exclusions() )
+        {
+            wxString serialized = wxString::FromUTF8( exclusion.marker().id().opaque_id() );
+
+            if( serialized.IsEmpty() )
+            {
+                ApiResponseStatus e;
+                e.set_status( ApiStatusCode::AS_BAD_REQUEST );
+                e.set_error_message( "DrcExclusion marker id must not be empty" );
+                return tl::unexpected( e );
+            }
+
+            newSettings.m_DrcExclusions.insert( serialized );
+            newSettings.m_DrcExclusionComments[serialized] = wxString::FromUTF8( exclusion.comment() );
+        }
+    }
+
+    std::vector<BOARD_DESIGN_SETTINGS::VALIDATION_ERROR> errors = newSettings.ValidateDesignRules();
+
+    if( !errors.empty() )
+    {
+        const BOARD_DESIGN_SETTINGS::VALIDATION_ERROR& error = errors.front();
+
+        ApiResponseStatus e;
+        e.set_status( ApiStatusCode::AS_BAD_REQUEST );
+        e.set_error_message( fmt::format( "Invalid board design rules: {}: {}",
+                                          error.setting_name.ToStdString(),
+                                          error.error_message.ToStdString() ) );
+        return tl::unexpected( e );
+    }
+
+    board()->SetDesignSettings( newSettings );
+
+    if( frame() )
+    {
+        frame()->OnModify();
+        frame()->UpdateUserInterface();
+    }
+
+    HANDLER_CONTEXT<GetBoardDesignRules> getCtx = { aCtx.ClientName, GetBoardDesignRules() };
+    *getCtx.Request.mutable_board() = aCtx.Request.board();
+
+    return handleGetBoardDesignRules( getCtx );
+}
+
+
+HANDLER_RESULT<CustomRulesResponse> API_HANDLER_PCB::handleGetCustomDesignRules(
+        const HANDLER_CONTEXT<GetCustomDesignRules>& aCtx )
+{
+    HANDLER_RESULT<bool> documentValidation = validateDocument( aCtx.Request.board() );
+
+    if( !documentValidation )
+        return tl::unexpected( documentValidation.error() );
+
+    CustomRulesResponse response;
+    response.set_status( CRS_NONE );
+
+    wxFileName fn = context()->GetBoard()->GetFileName();
+    fn.SetExt( FILEEXT::DesignRulesFileExtension );
+    wxString rulesPath = context()->Prj().AbsolutePath( fn.GetFullName() );
+
+    if( rulesPath.IsEmpty() || !wxFileName::IsFileReadable( rulesPath ) )
+        return response;
+
+    wxFFile file( rulesPath, "r" );
+
+    if( !file.IsOpened() )
+    {
+        response.set_status( CRS_INVALID );
+        response.set_error_text( "Failed to open custom rules file" );
+        return response;
+    }
+
+    wxString content;
+    file.ReadAll( &content );
+    file.Close();
+
+    std::vector<std::shared_ptr<DRC_RULE>> parsedRules;
+
+    try
+    {
+        DRC_RULES_PARSER parser( content, "File" );
+        parser.Parse( parsedRules, nullptr );
+    }
+    catch( const IO_ERROR& ioe )
+    {
+        response.set_status( CRS_INVALID );
+        response.set_error_text( ioe.What().ToStdString() );
+        return response;
+    }
+
+    for( const std::shared_ptr<DRC_RULE>& rule : parsedRules )
+    {
+        // TODO(JE) since we now need this for both here and the rules editor, maybe it's time
+        // to just make comment parsing part of the parser?
+        wxString text = DRC_RULE_LOADER::ExtractRuleText( content, rule->m_Name );
+        wxString comment = DRC_RULE_LOADER::ExtractRuleComment( text );
+
+        kiapi::board::CustomRule* customRule = response.add_rules();
+
+        if( rule->m_Condition )
+            customRule->set_condition( rule->m_Condition->GetExpression().ToUTF8() );
+
+        for( const DRC_CONSTRAINT& constraint : rule->m_Constraints )
+        {
+            board::CustomRuleConstraint* constraintProto = customRule->add_constraints();
+            constraint.ToProto( *constraintProto );
+        }
+
+        customRule->set_severity( ToProtoEnum<SEVERITY, types::RuleSeverity>( rule->m_Severity ) );
+        customRule->set_name( rule->m_Name.ToUTF8() );
+
+        if( rule->m_LayerSource.CmpNoCase( wxS( "outer" ) ) == 0 )
+        {
+            customRule->set_layer_mode( kiapi::board::CRLM_OUTER );
+        }
+        else if( rule->m_LayerSource.CmpNoCase( wxS( "inner" ) ) == 0 )
+        {
+            customRule->set_layer_mode( kiapi::board::CRLM_INNER );
+        }
+        else if( !rule->m_LayerSource.IsEmpty() )
+        {
+            int layer = LSET::NameToLayer( rule->m_LayerSource );
+
+            if( layer != UNDEFINED_LAYER && layer != UNSELECTED_LAYER && layer < PCB_LAYER_ID_COUNT )
+            {
+                customRule->set_single_layer(
+                        ToProtoEnum<PCB_LAYER_ID, board::types::BoardLayer>( static_cast<PCB_LAYER_ID>( layer ) ) );
+            }
+        }
+
+        if( !comment.IsEmpty() )
+            customRule->set_comments( comment );
+    }
+
+    response.set_status( CRS_VALID );
+    return response;
+}
+
+
+HANDLER_RESULT<CustomRulesResponse> API_HANDLER_PCB::handleSetCustomDesignRules(
+        const HANDLER_CONTEXT<SetCustomDesignRules>& aCtx )
+{
+    HANDLER_RESULT<bool> documentValidation = validateDocument( aCtx.Request.board() );
+
+    if( !documentValidation )
+        return tl::unexpected( documentValidation.error() );
+
+    wxFileName fn = context()->GetBoard()->GetFileName();
+    fn.SetExt( FILEEXT::DesignRulesFileExtension );
+    wxString rulesPath = context()->Prj().AbsolutePath( fn.GetFullName() );
+
+    if( aCtx.Request.rules_size() == 0 )
+    {
+        if( wxFileName::FileExists( rulesPath ) )
+        {
+            if( !wxRemoveFile( rulesPath ) )
+            {
+                CustomRulesResponse response;
+                response.set_status( CRS_INVALID );
+                response.set_error_text( "Failed to remove custom rules file" );
+                return response;
+            }
+        }
+
+        CustomRulesResponse response;
+        response.set_status( CRS_NONE );
+        return response;
+    }
+
+    wxString rulesText;
+    rulesText << "(version 1)\n";
+
+    for( const board::CustomRule& rule : aCtx.Request.rules() )
+    {
+        wxString serializationError;
+        wxString serializedRule = DRC_RULE::FormatRuleFromProto( rule, &serializationError );
+
+        if( serializedRule.IsEmpty() )
+        {
+            CustomRulesResponse response;
+            response.set_status( CRS_INVALID );
+
+            if( serializationError.IsEmpty() )
+                response.set_error_text( "Failed to serialize custom rule" );
+            else
+                response.set_error_text( serializationError.ToUTF8() );
+
+            return response;
+        }
+
+        rulesText << "\n" << serializedRule;
+    }
+
+    // Validate generated file text before writing so callers get parser errors in response.
+    try
+    {
+        std::vector<std::shared_ptr<DRC_RULE>> parsedRules;
+        DRC_RULES_PARSER parser( rulesText, "SetCustomDesignRules" );
+        parser.Parse( parsedRules, nullptr );
+    }
+    catch( const IO_ERROR& ioe )
+    {
+        CustomRulesResponse response;
+        response.set_status( CRS_INVALID );
+        response.set_error_text( ioe.What().ToStdString() );
+        return response;
+    }
+
+    wxFFile file( rulesPath, "w" );
+
+    if( !file.IsOpened() )
+    {
+        CustomRulesResponse response;
+        response.set_status( CRS_INVALID );
+        response.set_error_text( "Failed to open custom rules file for writing" );
+        return response;
+    }
+
+    if( !file.Write( rulesText ) )
+    {
+        file.Close();
+
+        CustomRulesResponse response;
+        response.set_status( CRS_INVALID );
+        response.set_error_text( "Failed to write custom rules file" );
+        return response;
+    }
+
+    file.Close();
+
+    HANDLER_CONTEXT<GetCustomDesignRules> getCtx = { aCtx.ClientName, GetCustomDesignRules() };
+    *getCtx.Request.mutable_board() = aCtx.Request.board();
+    return handleGetCustomDesignRules( getCtx );
 }
 
 

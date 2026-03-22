@@ -25,6 +25,7 @@
 
 // Common
 #include <api/api_enums.h>
+#include <api/board/board.pb.h>
 #include <api/common/types/enums.pb.h>
 #include <core/typeinfo.h>
 #include <font/text_attributes.h>
@@ -52,6 +53,7 @@
 #include <jobs/job_export_pcb_stats.h>
 #include <jobs/job_export_pcb_svg.h>
 #include <jobs/job_pcb_render.h>
+#include <drc/drc_rule.h>
 #include <padstack.h>
 #include <pcb_dimension.h>
 #include <pcb_track.h>
@@ -240,6 +242,11 @@ BOOST_AUTO_TEST_CASE( TeardropType )
     testEnums<TEARDROP_TYPE, kiapi::board::types::TeardropType>();
 }
 
+BOOST_AUTO_TEST_CASE( TeardropTarget )
+{
+    testEnums<TARGET_TD, kiapi::board::TeardropTarget>( true );
+}
+
 BOOST_AUTO_TEST_CASE( DimensionTextBorderStyle )
 {
     testEnums<DIM_TEXT_BORDER, kiapi::board::types::DimensionTextBorderStyle>();
@@ -293,6 +300,61 @@ BOOST_AUTO_TEST_CASE( BoardStackupLayerType )
 BOOST_AUTO_TEST_CASE( DrcSeverity )
 {
     testEnums<SEVERITY, kiapi::board::commands::DrcSeverity>();
+}
+
+BOOST_AUTO_TEST_CASE( RuleSeverity )
+{
+    testEnums<SEVERITY, kiapi::common::types::RuleSeverity>();
+}
+
+BOOST_AUTO_TEST_CASE( CustomRuleConstraintType )
+{
+    using ProtoType = kiapi::board::CustomRuleConstraintType;
+
+    for( DRC_CONSTRAINT_T value : magic_enum::enum_values<DRC_CONSTRAINT_T>() )
+    {
+        if( value == NULL_CONSTRAINT )
+            continue;
+
+        ProtoType proto = ToProtoEnum<DRC_CONSTRAINT_T, ProtoType>( value );
+        BOOST_REQUIRE( proto != ProtoType::CRCT_UNKNOWN );
+        BOOST_CHECK( ( FromProtoEnum<DRC_CONSTRAINT_T, ProtoType>( proto ) == value ) );
+    }
+
+    BOOST_CHECK( ( FromProtoEnum<DRC_CONSTRAINT_T, ProtoType>( ProtoType::CRCT_UNKNOWN )
+                   == NULL_CONSTRAINT ) );
+}
+
+BOOST_AUTO_TEST_CASE( CustomRuleConstraintOption )
+{
+    using ProtoType = kiapi::board::CustomRuleConstraintOption;
+
+    for( DRC_CONSTRAINT::OPTIONS value : magic_enum::enum_values<DRC_CONSTRAINT::OPTIONS>() )
+    {
+        if( value == DRC_CONSTRAINT::OPTIONS::NUM_OPTIONS )
+            continue;
+
+        ProtoType proto = ToProtoEnum<DRC_CONSTRAINT::OPTIONS, ProtoType>( value );
+        BOOST_REQUIRE( proto != ProtoType::CRCO_UNKNOWN );
+        BOOST_CHECK( ( FromProtoEnum<DRC_CONSTRAINT::OPTIONS, ProtoType>( proto ) == value ) );
+    }
+}
+
+BOOST_AUTO_TEST_CASE( CustomRuleDisallowType )
+{
+    using ProtoType = kiapi::board::CustomRuleDisallowType;
+
+    for( DRC_DISALLOW_T value : { DRC_DISALLOW_THROUGH_VIAS, DRC_DISALLOW_MICRO_VIAS,
+                                  DRC_DISALLOW_BLIND_VIAS, DRC_DISALLOW_BURIED_VIAS,
+                                  DRC_DISALLOW_TRACKS, DRC_DISALLOW_PADS,
+                                  DRC_DISALLOW_ZONES, DRC_DISALLOW_TEXTS,
+                                  DRC_DISALLOW_GRAPHICS, DRC_DISALLOW_HOLES,
+                                  DRC_DISALLOW_FOOTPRINTS } )
+    {
+        ProtoType proto = ToProtoEnum<DRC_DISALLOW_T, ProtoType>( value );
+        BOOST_REQUIRE( proto != ProtoType::CRDT_UNKNOWN );
+        BOOST_CHECK( ( FromProtoEnum<DRC_DISALLOW_T, ProtoType>( proto ) == value ) );
+    }
 }
 
 BOOST_AUTO_TEST_CASE( PlotDrillMarks )
