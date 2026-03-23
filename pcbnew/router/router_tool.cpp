@@ -74,6 +74,8 @@ using namespace std::placeholders;
 #include <project/project_file.h>
 #include <project/project_local_settings.h>
 
+#include <io/io_utils.h>
+
 #include "router_tool.h"
 #include "router_status_view_item.h"
 #include "pns_router.h"
@@ -691,6 +693,7 @@ void ROUTER_TOOL::saveRouterDebugLog()
 {
     static wxString mruPath = PATHS::GetDefaultUserProjectsPath();
     static size_t   lastLoggerSize = 0;
+    PNS::LOGGER::LOG_DATA logData;
 
     auto logger = m_router->Logger();
 
@@ -738,23 +741,28 @@ void ROUTER_TOOL::saveRouterDebugLog()
     prj->GetLocalSettings().SaveAs( fname_dump.GetPath(), fname_dump.GetName() );
 
     // Build log file:
-    std::vector<PNS::ITEM*> added, removed, heads;
-    m_router->GetUpdatedItems( removed, added, heads );
+    std::vector<PNS::ITEM*> removed;
+    m_router->GetUpdatedItems( removed, logData.m_AddedItems, logData.m_Heads );
 
-    std::set<KIID> removedKIIDs;
 
     for( auto item : removed )
     {
         wxASSERT_MSG( item->Parent() != nullptr, "removed an item with no parent uuid?" );
 
         if( item->Parent() )
-            removedKIIDs.insert( item->Parent()->m_Uuid );
+            logData.m_RemovedItems.insert( item->Parent()->m_Uuid );
     }
 
+    logData.m_BoardHash = IO_UTILS::fileHashMMH3( fname_dump.GetAbsolutePath() );
+
+    if( !logData.m_BoardHash ) // should never happen...
+        return;
+
+    logData.m_Mode = m_router->Mode();    
+    logData.m_Events = logger->GetEvents();
+
     FILE*    log_f = wxFopen( fname_log.GetAbsolutePath(), "wb" );
-    wxString logString = PNS::LOGGER::FormatLogFileAsString( m_router->Mode(),
-                                                             added, removedKIIDs, heads,
-                                                             logger->GetEvents() );
+    wxString logString = PNS::LOGGER::FormatLogFileAsJSON( logData );
 
     if( !log_f )
     {

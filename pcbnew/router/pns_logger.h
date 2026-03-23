@@ -30,11 +30,16 @@
 
 #include <math/vector2d.h>
 #include <kiid.h>
+#include <json_common.h>
 
 #include "pns_sizes_settings.h"
+#include "pns_router.h"
 
 class SHAPE_LINE_CHAIN;
 class SHAPE;
+
+void to_json( nlohmann::json& aJson, const VECTOR2I& aPoint );
+void from_json( const nlohmann::json& aJson, VECTOR2I& aPoint );
 
 namespace PNS {
 
@@ -43,6 +48,14 @@ class ITEM;
 class LOGGER
 {
 public:
+
+    enum TEST_CASE_TYPE 
+    {
+        TCT_STRICT_GEOMETRY = 0,
+        TCT_CONNECTIVITY_ONLY,
+        TCT_EXPECTED_FAIL,
+        TCT_KNOWN_BUG
+    };
 
     enum EVENT_TYPE {
         EVT_START_ROUTE = 0,
@@ -78,6 +91,19 @@ public:
         }
     };
 
+    struct LOG_DATA
+    {
+        LOG_DATA() {};
+        ~LOG_DATA() {};
+        ROUTER_MODE m_Mode;
+        std::optional<wxString> m_BoardHash;
+        std::vector<ITEM*> m_AddedItems;
+        std::set<KIID> m_RemovedItems;
+        std::vector<ITEM*> m_Heads;
+        std::vector<EVENT_ENTRY> m_Events;
+        std::optional<TEST_CASE_TYPE> m_TestCaseType;
+    };
+
     LOGGER();
     ~LOGGER();
 
@@ -94,18 +120,20 @@ public:
         return m_events;
     }
 
-    static wxString FormatLogFileAsString( int aMode,
-                                           const std::vector<ITEM*>& aAddedItems,
-                                           const std::set<KIID>&     aRemovedItems,
-                                           const std::vector<ITEM*>& aHeads,
-                                           const std::vector<EVENT_ENTRY>& aEvents );
-
-    static wxString FormatEvent( const EVENT_ENTRY& aEvent );
+    static nlohmann::json FormatEventAsJSON( const EVENT_ENTRY& aEvent );
 
     static EVENT_ENTRY ParseEvent( const wxString& aLine );
+    static EVENT_ENTRY ParseEventFromJSON( const nlohmann::json& aJSON );
+    static wxString FormatLogFileAsJSON( const LOG_DATA& aLogData );
 
 private:
+
+    static nlohmann::json formatSizesAsJSON( const SIZES_SETTINGS& aEvent );
+    static nlohmann::json formatRouterItemAsJSON( const PNS::ITEM* aItem );
+    static nlohmann::json formatShapeAsJSON( const SHAPE* aShape );
+
     std::vector<EVENT_ENTRY> m_events;
+    std::optional<TEST_CASE_TYPE> m_testCaseType;
 };
 
 }
