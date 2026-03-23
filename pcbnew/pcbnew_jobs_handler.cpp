@@ -1472,7 +1472,7 @@ int PCBNEW_JOBS_HANDLER::JobExportGerbers( JOB* aJob )
         else
             fileExt = FILEEXT::GerberFileExtension;
 
-        BuildPlotFileName( &fn, outPath, layerName, fileExt );
+        PCB_PLOTTER::BuildPlotFileName( &fn, outPath, layerName, fileExt );
         wxString fullname = fn.GetFullName();
 
         if( m_progressReporter )
@@ -1521,7 +1521,7 @@ int PCBNEW_JOBS_HANDLER::JobExportGerbers( JOB* aJob )
         wxFileName fn( brd->GetFileName() );
 
         // Build gerber job file from basename
-        BuildPlotFileName( &fn, outPath, wxT( "job" ), FILEEXT::GerberJobFileExtension );
+        PCB_PLOTTER::BuildPlotFileName( &fn, outPath, wxT( "job" ), FILEEXT::GerberJobFileExtension );
         jobfile_writer.CreateJobFile( fn.GetFullPath() );
         aJob->AddOutput( fn.GetFullPath() );
     }

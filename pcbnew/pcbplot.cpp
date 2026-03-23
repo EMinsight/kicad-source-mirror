@@ -374,11 +374,3 @@ void AddGerberX2Attribute( PLOTTER* aPlotter, const BOARD* aBoard, int aLayer,
     if( !text.IsEmpty() )
         aPlotter->AddLineToHeader( makeStringCompatX1( text, aUseX1CompatibilityMode ) );
 }
-
-
-void BuildPlotFileName( wxFileName* aFilename, const wxString& aOutputDir,
-                        const wxString& aSuffix, const wxString& aExtension )
-{
-    // Kept as compat, incase python junk used it
-    PCB_PLOTTER::BuildPlotFileName( aFilename, aOutputDir, aSuffix, aExtension );
-}
