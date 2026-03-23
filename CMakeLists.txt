@@ -32,10 +32,6 @@ endif()
 # Generate DEPFILES without transforming relative paths
 cmake_policy( SET CMP0116 OLD )
 
-# Needed to allow the doxygen-python process that depends on swig generation running twice to occur
-# The current structure requires the add_custom_command to get called twice, the NEW behavior deduplicates it
-cmake_policy( SET CMP0113 OLD )
-
 #  Enable CMAKE_MSVC_DEBUG_INFORMATION_FORMAT to override the cmake pdb flags easily
 if (POLICY CMP0141)
   cmake_policy(SET CMP0141 NEW)
