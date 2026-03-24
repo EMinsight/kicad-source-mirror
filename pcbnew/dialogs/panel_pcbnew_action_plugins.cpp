@@ -25,11 +25,13 @@
 #include <kiface_base.h>
 #include <kiplatform/ui.h>
 #include <panel_pcbnew_action_plugins.h>
+#include <paths.h>
 #include <pcb_edit_frame.h>
 #include <pcbnew_settings.h>
 #include <pgm_base.h>
 #include <settings/common_settings.h>
 #include <api/api_plugin_manager.h>
+#include <launch_ext.h>
 #include <widgets/grid_icon_text_helpers.h>
 #include <widgets/paged_dialog.h>
 #include <widgets/wx_grid.h>
@@ -106,12 +108,25 @@ PANEL_PCBNEW_ACTION_PLUGINS::PANEL_PCBNEW_ACTION_PLUGINS( wxWindow* aParent ) :
     m_openDirectoryButton->SetBitmap( KiBitmapBundle( BITMAPS::small_folder ) );
     m_reloadButton->SetBitmap( KiBitmapBundle( BITMAPS::small_refresh ) );
     m_showErrorsButton->SetBitmap( KiBitmapBundle( BITMAPS::small_warning ) );
+
+    wxTheApp->Bind( EDA_EVT_PLUGIN_AVAILABILITY_CHANGED,
+          &PANEL_PCBNEW_ACTION_PLUGINS::onPluginAvailabilityChanged, this );
 }
 
 
 PANEL_PCBNEW_ACTION_PLUGINS::~PANEL_PCBNEW_ACTION_PLUGINS()
 {
+    wxTheApp->Unbind( EDA_EVT_PLUGIN_AVAILABILITY_CHANGED,
+            &PANEL_PCBNEW_ACTION_PLUGINS::onPluginAvailabilityChanged, this );
     m_grid->PopEventHandler( true );
+}
+
+
+void PANEL_PCBNEW_ACTION_PLUGINS::onPluginAvailabilityChanged( wxCommandEvent& aEvt )
+{
+    m_grid->Enable();
+    TransferDataToWindow();
+    aEvt.Skip();
 }
 
 
@@ -165,7 +180,9 @@ void PANEL_PCBNEW_ACTION_PLUGINS::SwapRows( int aRowA, int aRowB )
 
 void PANEL_PCBNEW_ACTION_PLUGINS::OnReloadButtonClick( wxCommandEvent& event )
 {
-    TransferDataToWindow();
+    API_PLUGIN_MANAGER& mgr = Pgm().GetPluginManager();
+    mgr.ReloadPlugins();
+    m_grid->Disable();
 }
 
 
@@ -274,8 +291,8 @@ bool PANEL_PCBNEW_ACTION_PLUGINS::TransferDataToWindow()
 
 void PANEL_PCBNEW_ACTION_PLUGINS::OnOpenDirectoryButtonClick( wxCommandEvent& event )
 {
-    // TODO(JE)
-    //SCRIPTING_TOOL::ShowPluginFolder();
+    wxString dir( PATHS::GetUserPluginsPath() );
+    LaunchExternal( dir );
 }
 
 
