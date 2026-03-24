@@ -222,18 +222,6 @@ wxString PYTHON_MANAGER::FindPythonInterpreter()
 
     if( pythonExe.IsFileExecutable() )
         return pythonExe.GetFullPath();
-#elif defined( __WXMAC__ )
-    wxFileName pythonExe( PATHS::GetOSXKicadDataDir(), wxEmptyString );
-    pythonExe.RemoveLastDir();
-    pythonExe.AppendDir( wxT( "Frameworks" ) );
-    pythonExe.AppendDir( wxT( "Python.framework" ) );
-    pythonExe.AppendDir( wxT( "Versions" ) );
-    pythonExe.AppendDir( wxT( "Current" ) );
-    pythonExe.AppendDir( wxT( "bin" ) );
-    pythonExe.SetFullName(wxT( "python3" ) );
-
-    if( pythonExe.IsFileExecutable() )
-        return pythonExe.GetFullPath();
 #else
     wxFileName pythonExe;
 #endif
