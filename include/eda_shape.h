@@ -540,9 +540,7 @@ protected:
                                                 //   number box, thermal spoke template, etc.)
 };
 
-#ifndef SWIG
 DECLARE_ENUM_TO_WXANY( SHAPE_T );
 DECLARE_ENUM_TO_WXANY( LINE_STYLE );
 DECLARE_ENUM_TO_WXANY( UI_FILL_MODE );
-#endif
 

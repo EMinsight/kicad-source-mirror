@@ -252,7 +252,6 @@ public:
     void Show() const;
 #endif
 
-#ifndef SWIG
     /// Wrapper class, so you can iterate through NETINFO_ITEM*s, not
     /// std::pair<int/wxString, NETINFO_ITEM*>
     class iterator
@@ -310,7 +309,6 @@ public:
     {
         return iterator( m_netNames.end() );
     }
-#endif
 
     BOARD* GetParent() const
     {

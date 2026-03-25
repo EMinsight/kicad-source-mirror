@@ -377,13 +377,6 @@ public:
 
     const PCB_POINTS& Points() const { return m_points; }
 
-    // SWIG requires non-const accessors for some reason to make the custom iterators in board.i
-    // work.  It would be good to remove this if we can figure out how to fix that.
-#ifdef SWIG
-    DRAWINGS& Drawings() { return m_drawings; }
-    TRACKS& Tracks() { return m_tracks; }
-#endif
-
     const BOARD_ITEM_SET GetItemSet();
 
     /**
@@ -1018,7 +1011,6 @@ public:
         m_NetInfo.RemoveUnusedNets( aCommit );
     }
 
-#ifndef SWIG
     /**
      * @return iterator to the first element of the NETINFO_ITEMs list.
      */
@@ -1034,7 +1026,6 @@ public:
     {
         return m_NetInfo.end();
     }
-#endif
 
     /**
      * @return the number of nets (NETINFO_ITEM).

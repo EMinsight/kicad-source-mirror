@@ -494,9 +494,7 @@ protected:
     friend class BOARD;
 };
 
-#ifndef SWIG
 DECLARE_ENUM_TO_WXANY( PCB_LAYER_ID );
-#endif
 
 /**
  * A singleton item of this class is returned for a weak reference that no longer exists.
